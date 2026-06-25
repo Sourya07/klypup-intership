@@ -1,0 +1,31 @@
+{
+  "name": "ai-investment-research-dashboard-monorepo",
+  "version": "1.0.0",
+  "description": "Multi-tenant SaaS dashboard for AI-powered investment research",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "db:generate": "npm run db:generate --workspace=apps/api",
+    "db:migrate": "npm run db:migrate --workspace=apps/api",
+    "db:seed": "npm run db:seed --workspace=apps/api",
+    "db:setup": "bash scripts/setup-db.sh"
+  },
+  "keywords": [
+    "monorepo",
+    "react",
+    "express",
+    "prisma",
+    "neon",
+    "postgres",
+    "saas"
+  ],
+  "author": "",
+  "license": "ISC"
+}

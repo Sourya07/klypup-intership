@@ -1,0 +1,17 @@
+{
+  "name": "@dashboard/shared",
+  "version": "1.0.0",
+  "description": "Shared schemas and type definitions for the AI Investment Research Dashboard",
+  "main": "dist/index.js",
+  "types": "dist/index.d.type",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "dependencies": {
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

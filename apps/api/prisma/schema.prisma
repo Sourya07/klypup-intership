@@ -1,0 +1,133 @@
+// Prisma Schema for AI Investment Research Dashboard
+// Database: PostgreSQL (Neon Serverless)
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  ANALYST
+  VIEWER
+}
+
+model User {
+  id            String       @id @default(uuid())
+  email         String       @unique
+  name          String?
+  passwordHash  String
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  memberships   OrganizationMember[]
+  reports       ResearchReport[]
+  watchlists    Watchlist[]
+  comparisons   CompanyCompare[]
+}
+
+model Organization {
+  id          String       @id @default(uuid())
+  name        String
+  slug        String       @unique
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  members     OrganizationMember[]
+  reports     ResearchReport[]
+  watchlists  Watchlist[]
+  comparisons CompanyCompare[]
+}
+
+model OrganizationMember {
+  id             String       @id @default(uuid())
+  userId         String
+  organizationId String
+  role           Role         @default(ANALYST)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+}
+
+model ResearchReport {
+  id             String       @id @default(uuid())
+  title          String
+  summary        String?      @db.Text
+  analysis       String       @db.Text // AI Generated analysis
+  metadata       Json?        // Model parameters, prompt tokens, prompt text
+  createdById    String
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  createdBy    User         @relation(fields: [createdById], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  citations    Citation[]
+
+  @@index([organizationId])
+}
+
+model Citation {
+  id               String         @id @default(uuid())
+  reportId         String
+  sourceName       String         // Document, Article, or SEC filing name
+  sourceUrl        String?        // Link to file or source website
+  snippet          String         @db.Text // Exact content extracted from source
+  relevanceScore   Float?
+  createdAt        DateTime       @default(now())
+
+  report           ResearchReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+}
+
+model Watchlist {
+  id             String       @id @default(uuid())
+  name           String
+  description    String?
+  createdById    String
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  createdBy    User         @relation(fields: [createdById], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  items        WatchlistItem[]
+
+  @@index([organizationId])
+}
+
+model WatchlistItem {
+  id          String    @id @default(uuid())
+  watchlistId String
+  ticker      String    // e.g., AAPL, GOOG
+  companyName String
+  addedAt     DateTime  @default(now())
+
+  watchlist   Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+
+  @@unique([watchlistId, ticker])
+}
+
+model CompanyCompare {
+  id             String       @id @default(uuid())
+  name           String       // E.g., Tech Giants Comparison
+  tickers        String[]     // Array of tickers compared: ["AAPL", "MSFT"]
+  matrixData     Json         // Compiled metrics and AI evaluations
+  createdById    String
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  createdBy    User         @relation(fields: [createdById], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}

@@ -1,5 +1,6 @@
-// Prisma Schema for AI Investment Research Dashboard
+// ─── AI Investment Research Dashboard ────────────────────────────────
 // Database: PostgreSQL (Neon Serverless)
+// Multi-tenant: shared schema, orgId on all tenant-owned tables
 
 datasource db {
   provider  = "postgresql"
@@ -11,123 +12,226 @@ generator client {
   provider = "prisma-client-js"
 }
 
-enum Role {
+// ─── Enums ───────────────────────────────────────────────────────────
+
+enum UserRole {
   ADMIN
   ANALYST
-  VIEWER
+}
+
+enum ResearchStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum SourceType {
+  MARKET_DATA
+  NEWS
+  FILING
+  ANALYSIS
+  SENTIMENT
+  OTHER
+}
+
+// ─── Core Tenant Models ──────────────────────────────────────────────
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  inviteCode  String   @unique @default(uuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members        Membership[]
+  researchRuns   ResearchRun[]
+  reports        ResearchReport[]
+  watchlistItems WatchlistItem[]
+  auditLogs      AuditLog[]
+  invites        Invite[]
 }
 
 model User {
-  id            String       @id @default(uuid())
-  email         String       @unique
-  name          String?
-  passwordHash  String
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  memberships   OrganizationMember[]
-  reports       ResearchReport[]
-  watchlists    Watchlist[]
-  comparisons   CompanyCompare[]
+  memberships    Membership[]
+  refreshTokens  RefreshToken[]
+  researchRuns   ResearchRun[]
+  reports        ResearchReport[]
+  watchlistItems WatchlistItem[]
+  auditLogs      AuditLog[]
 }
 
-model Organization {
-  id          String       @id @default(uuid())
-  name        String
-  slug        String       @unique
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  members     OrganizationMember[]
-  reports     ResearchReport[]
-  watchlists  Watchlist[]
-  comparisons CompanyCompare[]
-}
-
-model OrganizationMember {
-  id             String       @id @default(uuid())
+model Membership {
+  id             String   @id @default(uuid())
   userId         String
   organizationId String
-  role           Role         @default(ANALYST)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  role           UserRole @default(ANALYST)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Invite {
+  id             String   @id @default(uuid())
+  email          String
+  organizationId String
+  role           UserRole @default(ANALYST)
+  token          String   @unique @default(uuid())
+  accepted       Boolean  @default(false)
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([token])
+  @@index([email])
+}
+
+// ─── Research ────────────────────────────────────────────────────────
+
+model ResearchRun {
+  id             String         @id @default(uuid())
+  query          String         @db.Text
+  symbols        String[]
+  tags           String[]
+  status         ResearchStatus @default(PENDING)
+  progress       Int            @default(0)
+  progressMsg    String?
+  errorMessage   String?
+  organizationId String
+  createdById    String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User             @relation(fields: [createdById], references: [id])
+  report       ResearchReport?
+
+  @@index([organizationId])
+  @@index([createdById])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model ResearchReport {
-  id             String       @id @default(uuid())
+  id             String   @id @default(uuid())
+  runId          String   @unique
   title          String
-  summary        String?      @db.Text
-  analysis       String       @db.Text // AI Generated analysis
-  metadata       Json?        // Model parameters, prompt tokens, prompt text
-  createdById    String
+  summary        String?  @db.Text
+  content        Json     // Structured sections: executive summary, financials, etc.
   organizationId String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdById    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  createdBy    User         @relation(fields: [createdById], references: [id])
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  citations    Citation[]
+  run          ResearchRun      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User              @relation(fields: [createdById], references: [id])
+  sources      ResearchSource[]
 
   @@index([organizationId])
+  @@index([createdById])
+  @@index([createdAt])
 }
 
-model Citation {
-  id               String         @id @default(uuid())
-  reportId         String
-  sourceName       String         // Document, Article, or SEC filing name
-  sourceUrl        String?        // Link to file or source website
-  snippet          String         @db.Text // Exact content extracted from source
-  relevanceScore   Float?
-  createdAt        DateTime       @default(now())
+model ResearchSource {
+  id             String     @id @default(uuid())
+  reportId       String
+  type           SourceType
+  title          String
+  url            String?
+  snippet        String     @db.Text
+  relevanceScore Float?
+  metadata       Json?
+  createdAt      DateTime   @default(now())
 
-  report           ResearchReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  report ResearchReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([type])
 }
 
-model Watchlist {
-  id             String       @id @default(uuid())
-  name           String
-  description    String?
-  createdById    String
-  organizationId String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-
-  createdBy    User         @relation(fields: [createdById], references: [id])
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  items        WatchlistItem[]
-
-  @@index([organizationId])
-}
+// ─── Watchlist ───────────────────────────────────────────────────────
 
 model WatchlistItem {
-  id          String    @id @default(uuid())
-  watchlistId String
-  ticker      String    // e.g., AAPL, GOOG
-  companyName String
-  addedAt     DateTime  @default(now())
+  id             String   @id @default(uuid())
+  symbol         String
+  companyName    String
+  notes          String?
+  organizationId String
+  createdById    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  watchlist   Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation(fields: [createdById], references: [id])
 
-  @@unique([watchlistId, ticker])
+  @@unique([organizationId, symbol])
+  @@index([organizationId])
+  @@index([symbol])
 }
 
-model CompanyCompare {
-  id             String       @id @default(uuid())
-  name           String       // E.g., Tech Giants Comparison
-  tickers        String[]     // Array of tickers compared: ["AAPL", "MSFT"]
-  matrixData     Json         // Compiled metrics and AI evaluations
-  createdById    String
-  organizationId String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+// ─── Cached Market Data ──────────────────────────────────────────────
 
-  createdBy    User         @relation(fields: [createdById], references: [id])
+model CompanySnapshot {
+  id           String   @id @default(uuid())
+  symbol       String
+  data         Json
+  fetchedAt    DateTime @default(now())
+  expiresAt    DateTime
+
+  @@unique([symbol])
+  @@index([symbol])
+  @@index([expiresAt])
+}
+
+// ─── Audit ───────────────────────────────────────────────────────────
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  action         String
+  resource       String
+  resourceId     String?
+  details        Json?
+  userId         String
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
 }

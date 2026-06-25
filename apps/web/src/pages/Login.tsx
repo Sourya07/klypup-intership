@@ -31,7 +31,7 @@ export const Login: React.FC = () => {
       await login({ email, password });
       navigate(from, { replace: true });
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Invalid credentials or connection issue. Try Demo Login.');
+      setError(err.message || 'Invalid credentials. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -39,12 +39,12 @@ export const Login: React.FC = () => {
 
   const handleDemoLogin = async () => {
     setLoading(true);
+    setError('');
     try {
-      // Bypasses with mock authentication context
-      await login({ email: 'sourya@klypup.com', password: 'password' });
+      await login({ email: 'test@klypup.com', password: 'password123' });
       navigate(from, { replace: true });
-    } catch (e) {
-      // ignore
+    } catch (err: any) {
+      setError(err.message || 'Demo login failed. Please sign up first.');
     } finally {
       setLoading(false);
     }

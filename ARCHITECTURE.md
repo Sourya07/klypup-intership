@@ -69,8 +69,7 @@ ai-investment-research-dashboard/
 │       └── tsconfig.json
 ├── docs/                          # Architecture diagrams, specifications, and walkthroughs
 ├── scripts/                       # Local environment configuration & database migration wrappers
-│   ├── setup-db.sh
-│   └── seed-helper.ts
+│   └── setup-db.sh
 ├── .env.example                   # Shared monorepo environment template
 ├── .gitignore                     # Global git exclusion configurations
 ├── docker-compose.yml             # Local service containers (Redis, Postgres)

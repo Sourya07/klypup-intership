@@ -111,7 +111,7 @@ export const Team: React.FC = () => {
             </div>
             <div className="border-t border-zinc-800 pt-4">
               <span className="text-zinc-500 font-bold block uppercase tracking-wider">Tenant ID Reference</span>
-              <span className="font-mono text-[10px] text-zinc-500 block truncate mt-1">{organization?.id || 'mock-org-id-456'}</span>
+              <span className="font-mono text-[10px] text-zinc-500 block truncate mt-1">{organization?.id || ''}</span>
             </div>
           </CardContent>
         </Card>

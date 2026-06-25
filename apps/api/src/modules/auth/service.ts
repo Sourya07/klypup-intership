@@ -33,7 +33,7 @@ export async function signup(input: SignupInput): Promise<AuthResponse> {
   const slug = slugify(input.organizationName) + '-' + uuidv4().slice(0, 6);
 
   // Transaction: create user, org, and membership atomically
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx:any) => {
     const user = await tx.user.create({
       data: {
         email: input.email,

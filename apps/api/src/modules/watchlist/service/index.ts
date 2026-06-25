@@ -1,0 +1,116 @@
+import { prisma } from '../../../lib';
+import { ConflictError, NotFoundError } from '../../../utils/errors';
+
+const COMPANY_NAMES: Record<string, string> = {
+  AAPL: 'Apple Inc.',
+  AMZN: 'Amazon.com, Inc.',
+  GOOGL: 'Alphabet Inc.',
+  META: 'Meta Platforms, Inc.',
+  MSFT: 'Microsoft Corporation',
+  NFLX: 'Netflix, Inc.',
+  NVDA: 'NVIDIA Corporation',
+  TSLA: 'Tesla, Inc.',
+};
+
+function normalizeTicker(ticker: string) {
+  return ticker.trim().toUpperCase();
+}
+
+function getCompanyName(symbol: string) {
+  return COMPANY_NAMES[symbol] || `${symbol} Holdings`;
+}
+
+async function fetchYahooWatchlistData(symbol: string) {
+  const ticker = symbol.trim().toUpperCase();
+  const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1mo&interval=1d`;
+  
+  try {
+    const response = await fetch(chartUrl);
+    if (!response.ok) throw new Error(`Status ${response.status}`);
+    const json = await response.json() as any;
+    const chart = json?.chart?.result?.[0];
+    const meta = chart?.meta;
+    
+    const price = meta?.regularMarketPrice ?? meta?.previousClose ?? 0;
+    const prevClose = meta?.previousClose ?? price;
+    const change = prevClose !== 0 ? Number((((price - prevClose) / prevClose) * 100).toFixed(2)) : 0;
+    const sentiment = change > 1.0 ? 'BULLISH' : change < -1.0 ? 'BEARISH' : 'NEUTRAL';
+    
+    const closes: Array<number | null> = chart?.indicators?.quote?.[0]?.close || [];
+    const history = closes
+      .filter((c): c is number => typeof c === 'number' && c !== null)
+      .slice(-8); // Get last 8 close prices for sparkline
+      
+    return {
+      price,
+      change,
+      sentiment,
+      trendScore: Math.round(50 + change * 8),
+      history: history.length > 0 ? history : [price, price, price, price, price, price, price, price],
+    };
+  } catch (err) {
+    console.error(`Failed to fetch Yahoo watchlist data for ${ticker}:`, err);
+    return {
+      price: 0,
+      change: 0,
+      sentiment: 'NEUTRAL',
+      trendScore: 50,
+      history: [0, 0, 0, 0, 0, 0, 0, 0],
+    };
+  }
+}
+
+export async function formatWatchlistItem(item: any) {
+  const ticker = item.symbol;
+  const marketData = await fetchYahooWatchlistData(ticker);
+
+  return {
+    id: item.id,
+    watchlistId: item.organizationId,
+    ticker,
+    companyName: item.companyName,
+    addedAt: item.createdAt.toISOString(),
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString(),
+    ...marketData,
+  };
+}
+
+export async function getWatchlist(orgId: string) {
+  return prisma.watchlistItem.findMany({
+    where: { organizationId: orgId },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+export async function addToWatchlist(orgId: string, userId: string, ticker: string) {
+  const symbol = normalizeTicker(ticker);
+  const existing = await prisma.watchlistItem.findUnique({
+    where: { organizationId_symbol: { organizationId: orgId, symbol } },
+  });
+
+  if (existing) {
+    throw new ConflictError(`${symbol} is already in your watchlist`);
+  }
+
+  return prisma.watchlistItem.create({
+    data: {
+      symbol,
+      companyName: getCompanyName(symbol),
+      organizationId: orgId,
+      createdById: userId,
+    },
+  });
+}
+
+export async function removeFromWatchlist(orgId: string, itemId: string) {
+  const item = await prisma.watchlistItem.findFirst({
+    where: { id: itemId, organizationId: orgId },
+  });
+
+  if (!item) {
+    throw new NotFoundError('Watchlist item');
+  }
+
+  await prisma.watchlistItem.delete({ where: { id: itemId } });
+}

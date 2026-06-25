@@ -83,10 +83,6 @@ export const ResearchResults: React.FC = () => {
       setReport(data);
       setEditTitle(data.title);
       setEditTags(data.tags?.join(', ') || '');
-      
-      // Check if this ticker is already watchlisted
-      const wl = await watchlistService.getWatchlist();
-      setInWatchlist(wl.some((w) => w.ticker === data.ticker));
     } catch (err) {
       setError('Could not retrieve the requested equity research report.');
     } finally {
@@ -97,6 +93,31 @@ export const ResearchResults: React.FC = () => {
   useEffect(() => {
     loadReport();
   }, [id]);
+
+  useEffect(() => {
+    if (!report) return;
+
+    let cancelled = false;
+    setWatchlistLoading(true);
+    watchlistService.getWatchlist()
+      .then((wl) => {
+        if (!cancelled) {
+          setInWatchlist(wl.some((w) => w.ticker === report.ticker));
+        }
+      })
+      .catch((e) => {
+        console.error('Failed to check watchlist status:', e);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setWatchlistLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [report]);
 
   const handleToggleWatchlist = async () => {
     if (!report) return;
@@ -194,15 +215,14 @@ export const ResearchResults: React.FC = () => {
   }
 
   // Generate metrics rows for the compact financials spreadsheet view
-  const financialHeaders = ['Financial Ratio / Metric', '2023A', '2024A', '2025E', '2026E'];
+  const financialHeaders = ['Financial Ratio / Metric', 'Value'];
   const financialRows = [
-    { label: 'Revenue ($ Billion)', values: ['383.29', '385.60', '395.20', '412.50'], isHeader: true },
-    { label: 'Gross Profit Margin (%)', values: ['44.1%', '44.6%', '45.2%', '45.8%'] },
-    { label: 'EBITDA Margin (%)', values: ['32.8%', '33.1%', '33.7%', '34.2%'] },
-    { label: 'Operating Cash Flow ($B)', values: ['110.54', '116.40', '124.50', '132.80'] },
-    { label: 'Diluted EPS ($)', values: [report.metrics?.eps || '6.13', '6.43', '6.85', '7.45'] },
-    { label: 'CapEx to Revenue Ratio (%)', values: ['2.6%', '2.8%', '3.2%', '3.5%'] },
-    { label: 'Total Debt to Equity (x)', values: [report.metrics?.debtEquity || '1.42', '1.38', '1.25', '1.15'] }
+    { label: 'Market Capitalization', values: [report.metrics?.marketCap || 'N/A'] },
+    { label: 'Trailing / Forward P/E Ratio', values: [report.metrics?.peRatio || 'N/A'] },
+    { label: 'Earnings Per Share (EPS)', values: [report.metrics?.eps || 'N/A'] },
+    { label: 'Revenue Growth (YoY)', values: [report.metrics?.revenueGrowth || 'N/A'] },
+    { label: 'Net Profit Margin', values: [report.metrics?.profitMargin || 'N/A'] },
+    { label: 'Debt-to-Equity Proxy', values: [report.metrics?.debtEquity || 'N/A'] }
   ];
 
   return (
@@ -519,10 +539,10 @@ export const ResearchResults: React.FC = () => {
               <div className="space-y-4">
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-[10px] uppercase font-bold text-zinc-400 dark:text-zinc-500 tracking-wider">
-                    Income & Leverage Summary
+                    Verified Financial Metrics
                   </span>
                   <span className="text-[10px] text-zinc-500 dark:text-zinc-400 italic">
-                    Values represented in USD Billions except EPS.
+                    Metrics extracted from real-time market quotes and SEC filings.
                   </span>
                 </div>
                 <FinancialTable headers={financialHeaders} rows={financialRows} />
@@ -560,16 +580,28 @@ export const ResearchResults: React.FC = () => {
                   <div className="md:col-span-2 space-y-4">
                     <span className="text-[10px] uppercase font-bold text-zinc-400 dark:text-zinc-500 tracking-wider block">AI Narrative Sentiment Breakdown</span>
                     <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                      Our sentiment engine parsed recent Bloomberg, Reuters, and SEC filing filings for {report.companyName}. The narrative shows an elevated level of institutional enthusiasm regarding Services margins, offsetting hardware supply volatility. Key topics of conversation include product pipeline acceleration and strategic capital allocation structures.
+                      Our sentiment engine analyzed recent filings and market data for {report.companyName} ({report.ticker}). 
+                      The consensus narrative indicates a <strong>{report.sentiment || 'NEUTRAL'}</strong> outlook, with a calculated sentiment score of <strong>{report.sentimentScore || 50}/100</strong>. 
+                      This is based on the company's financial indicators including its revenue growth rate ({report.metrics?.revenueGrowth || 'N/A'}), net profit margins ({report.metrics?.profitMargin || 'N/A'}), and historical stock price stability.
                     </p>
                     <div className="grid grid-cols-2 gap-3 pt-2">
                       <div className="p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg">
                         <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 block">Total Sentiment Citations</span>
-                        <span className="text-base font-bold text-zinc-800 dark:text-zinc-100 block mt-0.5">142 articles</span>
+                        <span className="text-base font-bold text-zinc-800 dark:text-zinc-100 block mt-0.5">
+                          {report.citations?.length || 0} verified sources
+                        </span>
                       </div>
                       <div className="p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg">
                         <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 block">Consensus Narrative</span>
-                        <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 block mt-0.5">Bullish Bias</span>
+                        <span className={`text-base font-bold block mt-0.5 ${
+                          report.sentiment === 'BULLISH' 
+                            ? 'text-emerald-600 dark:text-emerald-400' 
+                            : report.sentiment === 'BEARISH' 
+                              ? 'text-red-600 dark:text-red-400' 
+                              : 'text-amber-600 dark:text-amber-400'
+                        }`}>
+                          {report.sentiment || 'Neutral'} Consensus
+                        </span>
                       </div>
                     </div>
                   </div>

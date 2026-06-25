@@ -29,13 +29,7 @@ export const Signup: React.FC = () => {
       await signup({ name, email, password, organizationName });
       navigate('/', { replace: true });
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create organization. Using developer bypass...');
-      
-      // Fallback bypass
-      setTimeout(async () => {
-        await signup({ name, email, password, organizationName });
-        navigate('/', { replace: true });
-      }, 800);
+      setError(err.message || 'Failed to create organization. Please try again.');
     } finally {
       setLoading(false);
     }

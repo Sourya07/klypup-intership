@@ -23,6 +23,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [role, setRole] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const clearSession = () => {
+    setUser(null);
+    setOrganization(null);
+    setRole(null);
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userRole');
+  };
+
   const fetchCurrentUser = async () => {
     try {
       const accessToken = localStorage.getItem('accessToken');
@@ -41,44 +50,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Failed to restore authentication session:', error);
-      // In case of a database issue or server issue, we provide robust mock credentials
-      // to ensure a flawless experience for testing/assessment purposes
-      provideMockSession();
+      // Session is invalid — clear tokens and redirect to login
+      clearSession();
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const provideMockSession = () => {
-    // If the database is completely offline or Neon connection timed out,
-    // we use premium mock state for seamless client operation.
-    const mockUser: User = {
-      id: 'mock-analyst-id-123',
-      name: 'Sourya Analyst',
-      email: 'sourya@klypup.com',
-      createdAt: new Date().toISOString()
-    };
-    const mockOrg: Organization = {
-      id: 'mock-org-id-456',
-      name: 'ai research Capital',
-      slug: 'ai research-capital',
-      createdAt: new Date().toISOString()
-    };
-    setUser(mockUser);
-    setOrganization(mockOrg);
-    setRole('ADMIN');
-    localStorage.setItem('userRole', 'ADMIN');
-    localStorage.setItem('accessToken', 'mock-access-token');
-    localStorage.setItem('refreshToken', 'mock-refresh-token');
   };
 
   useEffect(() => {
     fetchCurrentUser();
 
     const handleSessionExpired = () => {
-      setUser(null);
-      setOrganization(null);
-      setRole(null);
+      clearSession();
     };
 
     window.addEventListener('auth_session_expired', handleSessionExpired);
@@ -101,9 +84,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('refreshToken', data.tokens.refreshToken);
         localStorage.setItem('userRole', data.role);
       }
-    } catch (error) {
-      console.warn('Login connection failed. Using mock developer session.');
-      provideMockSession();
+    } catch (error: any) {
+      const msg = error.response?.data?.error || 'Invalid email or password';
+      throw new Error(msg);
     } finally {
       setIsLoading(false);
     }
@@ -123,9 +106,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('refreshToken', data.tokens.refreshToken);
         localStorage.setItem('userRole', data.role);
       }
-    } catch (error) {
-      console.warn('Signup connection failed. Using mock developer session.');
-      provideMockSession();
+    } catch (error: any) {
+      const msg = error.response?.data?.error || 'Failed to create account';
+      throw new Error(msg);
     } finally {
       setIsLoading(false);
     }
@@ -140,12 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.warn('Logout endpoint did not respond.');
     } finally {
-      setUser(null);
-      setOrganization(null);
-      setRole(null);
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('userRole');
+      clearSession();
     }
   };
 

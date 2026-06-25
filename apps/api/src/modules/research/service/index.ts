@@ -7,7 +7,7 @@ const SEC_USER_AGENT = process.env.SEC_USER_AGENT || 'Klypup Research contact@ex
 
 type MetricValue = number | string | null;
 
-interface RealResearchData {
+export interface RealResearchData {
   ticker: string;
   companyName: string;
   currency?: string;
@@ -337,7 +337,7 @@ This report is generated from real data sources. Missing fields are marked as un
   };
 }
 
-async function fetchRealResearchData(ticker: string): Promise<RealResearchData> {
+export async function fetchRealResearchData(ticker: string): Promise<RealResearchData> {
   const symbol = ticker.trim().toUpperCase();
   const [yahooData, secData] = await Promise.allSettled([
     fetchYahooData(symbol),
@@ -413,6 +413,27 @@ async function fetchYahooData(ticker: string) {
   };
 }
 
+function getLatestFinancialConcept(usGaap: any, concepts: string[]) {
+  let bestConcept: any = null;
+  let bestEndDate = '';
+
+  for (const name of concepts) {
+    const concept = usGaap[name];
+    if (!concept) continue;
+    
+    const records = annualValues(concept);
+    if (records.length === 0) continue;
+    
+    const latestRecord = records[0];
+    if (!bestConcept || String(latestRecord.end).localeCompare(bestEndDate) > 0) {
+      bestConcept = concept;
+      bestEndDate = latestRecord.end;
+    }
+  }
+
+  return bestConcept;
+}
+
 async function fetchSecData(ticker: string) {
   const cik = await getSecCik(ticker);
   if (!cik) return null;
@@ -424,10 +445,17 @@ async function fetchSecData(ticker: string) {
   }) as any;
   const usGaap = facts?.facts?.['us-gaap'] || {};
 
+  // Dynamically select the best revenue concept based on the most recent reporting date
+  const revenueConcept = getLatestFinancialConcept(usGaap, [
+    'Revenues',
+    'SalesRevenueNet',
+    'RevenueFromContractWithCustomerExcludingAssessedTax'
+  ]);
+
   return {
     companyName: facts?.entityName || getCompanyName(ticker),
-    revenue: latestAnnualValue(usGaap.Revenues) ?? latestAnnualValue(usGaap.SalesRevenueNet) ?? latestAnnualValue(usGaap.RevenueFromContractWithCustomerExcludingAssessedTax),
-    priorRevenue: priorAnnualValue(usGaap.Revenues) ?? priorAnnualValue(usGaap.SalesRevenueNet) ?? priorAnnualValue(usGaap.RevenueFromContractWithCustomerExcludingAssessedTax),
+    revenue: revenueConcept ? latestAnnualValue(revenueConcept) : null,
+    priorRevenue: revenueConcept ? priorAnnualValue(revenueConcept) : null,
     netIncome: latestAnnualValue(usGaap.NetIncomeLoss),
     assets: latestInstantValue(usGaap.Assets),
     liabilities: latestInstantValue(usGaap.Liabilities),

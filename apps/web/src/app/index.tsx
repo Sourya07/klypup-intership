@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
+import { WebSocketProvider } from '../context/WebSocketContext';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { Layout } from '../components/Layout';
 
@@ -38,101 +39,103 @@ const NotFound: React.FC = () => (
 export default function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <BrowserRouter>
-        <Routes>
-          
-          {/* Public Authentication Routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-
-          {/* Protected Monorepo App Routes */}
-          <Route 
-            path="/" 
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Dashboard />
-                </Layout>
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/research/new" 
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <NewResearch />
-                </Layout>
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/reports" 
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Reports />
-                </Layout>
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/reports/:id" 
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <ResearchResults />
-                </Layout>
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/compare" 
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Compare />
-                </Layout>
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/watchlist" 
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Watchlist />
-                </Layout>
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/team" 
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Team />
-                </Layout>
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* Global Fallback Route */}
-          <Route 
-            path="*" 
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <NotFound />
-                </Layout>
-              </ProtectedRoute>
-            } 
-          />
-
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+      <WebSocketProvider>
+        <AuthProvider>
+          <BrowserRouter>
+          <Routes>
+            
+            {/* Public Authentication Routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+  
+            {/* Protected Monorepo App Routes */}
+            <Route 
+              path="/" 
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Dashboard />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/research/new" 
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <NewResearch />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/reports" 
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Reports />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/reports/:id" 
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ResearchResults />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/compare" 
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Compare />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/watchlist" 
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Watchlist />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/team" 
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Team />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+  
+            {/* Global Fallback Route */}
+            <Route 
+              path="*" 
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <NotFound />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+  
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+      </WebSocketProvider>
     </ThemeProvider>
   );
 }

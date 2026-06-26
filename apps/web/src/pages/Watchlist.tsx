@@ -36,6 +36,29 @@ export const Watchlist: React.FC = () => {
     loadWatchlist();
   }, []);
 
+  useEffect(() => {
+    const handleStockUpdate = (e: Event) => {
+      const { detail: update } = e as CustomEvent;
+      setWatchlist((prevWatchlist) =>
+        prevWatchlist.map((item) =>
+          item.ticker === update.symbol
+            ? {
+                ...item,
+                price: update.price,
+                change: update.change,
+                sentiment: update.sentiment,
+                trendScore: update.trendScore,
+                history: update.history,
+              }
+            : item
+        )
+      );
+    };
+
+    window.addEventListener('stock-update', handleStockUpdate);
+    return () => window.removeEventListener('stock-update', handleStockUpdate);
+  }, []);
+
   const handleAddTicker = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTicker) return;

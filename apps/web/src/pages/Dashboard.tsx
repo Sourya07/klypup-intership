@@ -59,6 +59,29 @@ export const Dashboard: React.FC = () => {
     loadDashboardData();
   }, []);
 
+  useEffect(() => {
+    const handleStockUpdate = (e: Event) => {
+      const { detail: update } = e as CustomEvent;
+      setWatchlist((prevWatchlist) =>
+        prevWatchlist.map((item) =>
+          item.ticker === update.symbol
+            ? {
+                ...item,
+                price: update.price,
+                change: update.change,
+                sentiment: update.sentiment,
+                trendScore: update.trendScore,
+                history: update.history,
+              }
+            : item
+        )
+      );
+    };
+
+    window.addEventListener('stock-update', handleStockUpdate);
+    return () => window.removeEventListener('stock-update', handleStockUpdate);
+  }, []);
+
   if (loading) {
     return (
       <div className="space-y-6">

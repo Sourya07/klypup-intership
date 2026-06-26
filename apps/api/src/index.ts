@@ -9,6 +9,7 @@ import compareRouter from "./modules/compare/routes";
 import webhooksRouter from "./modules/webhooks/routes";
 import { errorHandler } from "./middleware";
 import { sendError } from "./utils";
+import { initWebSocketServer } from "./lib";
 
 dotenv.config();
 
@@ -50,8 +51,10 @@ app.use("/api", (req, res) => {
 app.use(errorHandler());
 
 // Start Server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 API Server is running on port ${PORT}`);
 });
+
+initWebSocketServer(server);
 
 export default app;

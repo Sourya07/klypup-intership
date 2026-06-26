@@ -337,38 +337,84 @@ This report is generated from real data sources. Missing fields are marked as un
   };
 }
 
+async function fetchFinnhubData(symbol: string) {
+  const apiKey = process.env.FINNHUB_API_KEY;
+  if (!apiKey) return null;
+
+  const ticker = symbol.trim().toUpperCase();
+  
+  try {
+    const [quoteRes, profileRes, metricRes] = await Promise.allSettled([
+      fetchJson(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${apiKey}`),
+      fetchJson(`https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${apiKey}`),
+      fetchJson(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${apiKey}`)
+    ]);
+
+    const quote = quoteRes.status === 'fulfilled' ? quoteRes.value as any : null;
+    const profile = profileRes.status === 'fulfilled' ? profileRes.value as any : null;
+    const metrics = metricRes.status === 'fulfilled' ? metricRes.value as any : null;
+
+    if (!quote && !profile && !metrics) return null;
+
+    const currentPrice = numberOrNull(quote?.c ?? (profile?.marketCapitalization && profile?.shareOutstanding ? (profile.marketCapitalization / profile.shareOutstanding) : null));
+    const previousClose = numberOrNull(quote?.pc);
+    
+    const marketCapM = numberOrNull(metrics?.metric?.marketCapitalization ?? profile?.marketCapitalization);
+    const marketCap = marketCapM ? marketCapM * 1_000_000 : null;
+
+    const peRatio = numberOrNull(metrics?.metric?.peTTM ?? metrics?.metric?.peBasicExclExtraTTM);
+    const eps = numberOrNull(metrics?.metric?.epsExclExtraItemsTTM ?? metrics?.metric?.epsBasicExclExtraTTM);
+
+    return {
+      companyName: profile?.name || null,
+      currency: profile?.currency || 'USD',
+      currentPrice,
+      previousClose,
+      marketCap,
+      peRatio,
+      eps,
+    };
+  } catch (err) {
+    console.error(`Failed to fetch Finnhub data for ${ticker}:`, err);
+    return null;
+  }
+}
+
 export async function fetchRealResearchData(ticker: string): Promise<RealResearchData> {
   const symbol = ticker.trim().toUpperCase();
-  const [yahooData, secData] = await Promise.allSettled([
+  const [finnhubData, yahooData, secData] = await Promise.allSettled([
+    fetchFinnhubData(symbol),
     fetchYahooData(symbol),
     fetchSecData(symbol),
   ]);
 
+  const finnhub = finnhubData.status === 'fulfilled' ? finnhubData.value : null;
   const yahoo = yahooData.status === 'fulfilled' ? yahooData.value : null;
   const sec = secData.status === 'fulfilled' ? secData.value : null;
 
-  if (!yahoo && !sec) {
+  if (!finnhub && !yahoo && !sec) {
     throw new Error(`Could not retrieve real market or SEC data for ${symbol}. Check the ticker symbol or external data connectivity.`);
   }
 
-  const currentPrice = yahoo?.currentPrice ?? null;
-  const eps = yahoo?.eps || sec?.eps || null;
+  const currentPrice = finnhub?.currentPrice ?? yahoo?.currentPrice ?? null;
+  const previousClose = finnhub?.previousClose ?? yahoo?.previousClose ?? null;
+  const eps = finnhub?.eps ?? yahoo?.eps ?? sec?.eps ?? null;
 
-  // Calculate P/E if not returned by Yahoo (Price / EPS)
-  const trailingPe = yahoo?.trailingPe ?? (currentPrice && eps && eps > 0 ? Number((currentPrice / eps).toFixed(2)) : null);
+  // Calculate P/E if not returned by Finnhub or Yahoo (Price / EPS)
+  const trailingPe = finnhub?.peRatio ?? yahoo?.trailingPe ?? (currentPrice && eps && eps > 0 ? Number((currentPrice / eps).toFixed(2)) : null);
 
-  // Calculate Market Cap if not returned by Yahoo (Price * Outstanding Shares)
-  let marketCap = yahoo?.marketCap ?? null;
+  // Calculate Market Cap if not returned by Finnhub or Yahoo (Price * Outstanding Shares)
+  let marketCap = finnhub?.marketCap ?? yahoo?.marketCap ?? null;
   if (!marketCap && currentPrice && sec?.sharesOutstanding) {
     marketCap = currentPrice * sec.sharesOutstanding;
   }
 
   return {
     ticker: symbol,
-    companyName: yahoo?.companyName || sec?.companyName || getCompanyName(symbol),
-    currency: yahoo?.currency || 'USD',
+    companyName: finnhub?.companyName || yahoo?.companyName || sec?.companyName || getCompanyName(symbol),
+    currency: finnhub?.currency || yahoo?.currency || 'USD',
     currentPrice,
-    previousClose: yahoo?.previousClose ?? null,
+    previousClose,
     marketCap,
     trailingPe,
     forwardPe: yahoo?.forwardPe ?? null,

@@ -375,7 +375,7 @@ export const ResearchResults: React.FC = () => {
             changeType="positive"
           />
           <MetricCard 
-            label="Operating Margin" 
+            label="Net Profit Margin" 
             value={report.metrics?.profitMargin || 'N/A'} 
             change="Industry Leading" 
             changeType="positive"

@@ -5,6 +5,7 @@ import authRouter from "./modules/auth/routes";
 import orgsRouter from "./modules/organizations/routes";
 import researchRouter from "./modules/research/routes";
 import watchlistRouter from "./modules/watchlist/routes";
+import compareRouter from "./modules/compare/routes";
 import { errorHandler } from "./middleware";
 import { sendError } from "./utils";
 
@@ -33,6 +34,9 @@ app.use("/api/v1/research", researchRouter);
 
 app.use("/api/watchlist", watchlistRouter);
 app.use("/api/v1/watchlist", watchlistRouter);
+
+app.use("/api/compare", compareRouter);
+app.use("/api/v1/compare", compareRouter);
 
 app.use("/api", (req, res) => {
   sendError(res, 404, `API route not found: ${req.method} ${req.originalUrl}`);

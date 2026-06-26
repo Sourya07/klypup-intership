@@ -11,6 +11,7 @@ RUN npm ci
 
 COPY . .
 
+RUN npx prisma generate --schema=apps/api/prisma/schema.prisma
 RUN npm run build --workspace=packages/shared
 RUN npm run build --workspace=apps/api
 
@@ -26,6 +27,8 @@ COPY apps/api/package*.json ./apps/api/
 COPY packages/shared/package*.json ./packages/shared/
 
 RUN npm ci --only=production
+COPY --from=builder /usr/src/app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /usr/src/app/node_modules/@prisma/client ./node_modules/@prisma/client
 
 COPY --from=builder /usr/src/app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /usr/src/app/apps/api/dist ./apps/api/dist

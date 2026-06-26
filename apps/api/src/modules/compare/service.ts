@@ -150,9 +150,9 @@ export async function compareCompanies(tickers: string[]): Promise<CompareRespon
   addChartRow('Profit Margin (%)', (d) => d.revenue && d.revenue > 0 ? Number(((d.netIncome || 0) / d.revenue * 100)) : 0);
   addChartRow('Debt to Equity', (d) => d.equity && d.equity > 0 ? Number((d.liabilities || 0) / d.equity) : 0);
 
-  // Call Grok to write comparison summary
+  // Call Gemini to write comparison summary
   let summary = `Comparative evaluation of ${symbolList.join(', ')} based on live market data and SEC Edgar company facts.`;
-  const apiKey = process.env.XAI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (apiKey && rawDataList.length > 0) {
     try {
       const systemPrompt = `You are an elite equity research analyst and investment strategist.
@@ -163,31 +163,25 @@ Focus on relative valuation, growth trade-offs, and balance sheet leverage. Do n
 Data payload:
 ${JSON.stringify(companies, null, 2)}`;
 
-      const response = await fetch('https://api.x.ai/v1/chat/completions', {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'grok-2',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-          ],
-          temperature: 0.2,
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ parts: [{ text: userPrompt }] }],
+          generationConfig: { temperature: 0.2 },
         }),
       });
 
       if (response.ok) {
         const json = await response.json() as any;
-        const text = json.choices?.[0]?.message?.content;
+        const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) {
           summary = text.trim();
         }
       }
     } catch (err: any) {
-      console.error('Failed to generate comparison summary using Grok, using fallback:', err.message);
+      console.error('Failed to generate comparison summary using Gemini, using fallback:', err.message);
     }
   }
 

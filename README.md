@@ -1,23 +1,23 @@
 # Klypup — AI Investment Research Platform
 
-> **Multi-tenant SaaS platform** for AI-powered equity research. Analysts can generate deep-dive reports, track watchlists with live price feeds, compare companies side-by-side, and collaborate securely within org-scoped workspaces — all backed by real-time WebSocket updates and a Grok-powered AI research engine.
+> **Multi-tenant SaaS platform** for AI-powered equity research. Analysts can generate deep-dive reports, track watchlists with live price feeds, compare companies side-by-side, and collaborate securely within org-scoped workspaces — all backed by real-time WebSocket updates and a Gemini-powered AI research engine.
 
 ---
 
-##  Features at a Glance
+## Features at a Glance
 
 | Feature | Description |
 |---|---|
-|  **AI Research Engine** | Run deep equity research via Grok AI (xAI). Generates structured financial reports with citations from SEC filings and market data. |
-|  **Live Watchlist** | Track companies with real-time price ticks via a Finnhub WebSocket webhook stream, cached in-memory (15-min TTL). |
-|  **Company Comparisons** | Side-by-side AI-generated comparisons across financial metrics for any set of companies. |
+| **AI Research Engine** | Run deep equity research via Google Gemini AI. Generates structured financial reports with citations from SEC filings and market data. |
+| **Live Watchlist** | Track companies with real-time price ticks via a direct Finnhub WebSocket connection, cached in-memory (15-min TTL), with a Finnhub REST fallback. |
+| **Company Comparisons** | Side-by-side AI-generated comparisons across financial metrics for any set of companies. |
 | **Real-Time Updates** | WebSocket server broadcasts `STOCK_UPDATE` events to all connected browser clients instantly. |
-|  **Multi-Tenancy (RBAC)** | Workspace-level data isolation via `organizationId`. Roles: `ADMIN`, `ANALYST`, `VIEWER`. |
-|  **Citations & Sources** | Every research report links to verifiable SEC filings, market data sources, and financial fact JSON payloads. |
+| **Multi-Tenancy (RBAC)** | Workspace-level data isolation via `organizationId`. Roles: `ADMIN`, `ANALYST`, `VIEWER`. |
+| **Citations & Sources** | Every research report links to verifiable SEC filings, market data sources, and financial fact JSON payloads. |
 
 ---
 
-##  Tech Stack
+## Tech Stack
 
 ### Backend (`apps/api`)
 | Layer | Technology |
@@ -26,9 +26,9 @@
 | ORM | Prisma |
 | Database | Neon Serverless PostgreSQL |
 | Auth | JWT (RS256) |
-| Real-time | `ws` WebSocket Server |
-| AI | Grok AI API (`x.ai`) |
-| Financial Data | Yahoo Finance API · SEC EDGAR (data.sec.gov) · Finnhub Webhook Stream |
+| Real-time | `ws` WebSocket Server & Finnhub WS Client |
+| AI | Google Gemini API |
+| Financial Data | Finnhub WebSocket/REST · Yahoo Finance API · SEC EDGAR (data.sec.gov) |
 
 ### Frontend (`apps/web`)
 | Layer | Technology |
@@ -49,7 +49,7 @@
 
 ---
 
-##  Workspace Structure
+## Workspace Structure
 
 ```
 klypup/
@@ -71,7 +71,7 @@ klypup/
 
 ---
 
-##  Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -107,9 +107,8 @@ Key variables to set:
 | `DATABASE_URL` | Neon (or local) PostgreSQL connection string |
 | `DIRECT_URL` | Direct connection URL (for Prisma migrations) |
 | `JWT_SECRET` | Min. 32-char random secret for JWT signing |
-| `XAI_API_KEY` | Grok AI (`x.ai`) API key for research engine |
-| `FINNHUB_API_KEY` | Finnhub key for real-time price webhook stream |
-| `FINNHUB_WEBHOOK_SECRET` | Webhook signature verification secret |
+| `GEMINI_API_KEY` | Google Gemini API key for research engine |
+| `FINNHUB_API_KEY` | Finnhub key for real-time price WebSocket stream and REST fallback |
 | `SEC_USER_AGENT` | Required `User-Agent` header for SEC EDGAR requests |
 | `VITE_API_URL` | Frontend → Backend base URL (default: `http://localhost:8000/api/v1`) |
 
@@ -134,7 +133,7 @@ npm run dev           # Starts both API (port 8000) and Web (port 5173) concurre
 
 ---
 
-## 🌐 API Overview
+## API Overview
 
 All endpoints are prefixed with `/api/v1`.
 
@@ -159,14 +158,9 @@ All endpoints are prefixed with `/api/v1`.
 | `POST` | `/watchlist` | Add a company to the watchlist |
 | `DELETE` | `/watchlist/:id` | Remove a company from the watchlist |
 
-### Webhooks
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/v1/webhooks/finnhub` | Finnhub real-time price feed ingestion |
-
 ---
 
-##  Request Lifecycle (AI Research Run)
+## Request Lifecycle (AI Research Run)
 
 ```
 Browser                   Express API                  External Services
@@ -176,7 +170,7 @@ Browser                   Express API                  External Services
   │                           │── Spawn background job ──────►│
   │                           │◄─ Yahoo Finance: prices ──────│
   │                           │◄─ SEC EDGAR: filings  ────────│
-  │                           │◄─ Grok AI: report JSON ───────│
+  │                           │◄─ Gemini AI: report JSON ─────│
   │                           │── Save to Neon DB ────────────│
   │◄── WS: STOCK_UPDATE ─────│                               │
   │── GET /research/runs/:id ►│                               │
@@ -187,7 +181,7 @@ See the full architecture diagram for all data flows: [`image.png`](./image.png)
 
 ---
 
-##  Architecture
+## Architecture
 
 ### Layered Backend (N-Tier)
 
@@ -210,7 +204,7 @@ src/store/         ← Zustand global state slices
 
 ---
 
-## ☁️ CI/CD & Deployment (AWS EC2)
+## CI/CD & Deployment (AWS EC2)
 
 The repository includes a ready-to-use GitHub Actions CD pipeline ([`cd.yml`](./.github/workflows/cd.yml)) configured for deployment to an AWS EC2 instance.
 
@@ -226,16 +220,15 @@ To enable this, set the following secrets in your GitHub repository:
 
 ---
 
-## 🔒 Security
+## Security
 
 - **JWT Authentication** on all protected routes
 - **Tenant Isolation** — every DB query scoped by `organizationId`
 - **RBAC Middleware** — role checks (`ADMIN` / `ANALYST` / `VIEWER`) enforced server-side
-- **Webhook Signature Verification** — Finnhub `HMAC-SHA256` secret validated before processing
 - **Input Validation** — Zod schemas gate every incoming request at the controller boundary
 
 ---
 
-##  License
+## License
 
 ISC — see [LICENSE](./LICENSE) for details.

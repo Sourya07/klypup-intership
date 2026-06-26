@@ -53,7 +53,7 @@ The following diagram (see [`image.png`](./image.png)) shows the full data flow 
 
           ┌──────────────────────────────────────────────────────────────────┐
           │               External APIs & Data Feeds                        │
-          │   Finnhub Webhook Stream │ Yahoo Finance API │ SEC EDGAR │ Grok  │
+          │   Finnhub WebSocket/REST │ Yahoo Finance API │ SEC EDGAR │ Gemini│
           └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -71,19 +71,19 @@ The following diagram (see [`image.png`](./image.png)) shows the full data flow 
 5.  Background Job:
       a. Fetches historical prices           ← Yahoo Finance API
       b. Fetches SEC filings                 ← SEC EDGAR (data.sec.gov)
-      c. Builds structured AI payload        ← Grok AI API (xAI)
-      d. Receives Financial Facts Report JSON from Grok
+      c. Builds structured AI payload        ← Google Gemini API
+      d. Receives Financial Facts Report JSON from Gemini
       e. Saves completed report + citations  → Prisma → Neon PostgreSQL
       f. Broadcasts STOCK_UPDATE event       → WebSocket Server → all clients
 6.  Browser WebSocketContext receives STOCK_UPDATE, triggers UI refresh
 7.  Browser → GET /api/v1/research/runs/:id  → receives full report JSON
 ```
 
-### 2.2 Live Watchlist & Finnhub Webhook Flow
+### 2.2 Live Watchlist & Finnhub WebSocket Flow
 
 ```
-1.  Finnhub Cloud → POST /api/v1/webhooks/finnhub  (HMAC-SHA256 signature verified)
-2.  Webhook Module merges the incoming price tick into the in-memory cache
+1.  Backend connects out to wss://ws.finnhub.io and subscribes to active tickers
+2.  Finnhub WebSocket client receives live trade ticks and merges into in-memory cache
 3.  Watchlist Module reads the cache (15-min TTL) before falling back to a DB query
 4.  On a cache miss → Prisma fetch → response + cache repopulation
 5.  WebSocket Server broadcasts STOCK_UPDATE to all connected browser clients

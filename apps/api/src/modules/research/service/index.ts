@@ -195,7 +195,7 @@ function mapCitationType(sourceName: string): SourceType {
 }
 
 async function planResearchTools(ticker: string, prompt: string): Promise<string[]> {
-  const apiKey = process.env.XAI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return ['MARKET_DATA', 'SEC_FILINGS', 'NEWS'];
 
   const systemPrompt = `You are an AI research planner. Based on the user's query about ticker ${ticker}, decide which data tools are required.
@@ -207,22 +207,19 @@ Available tools:
 Return ONLY a JSON array of strings representing the tools needed. Example: ["MARKET_DATA", "NEWS"]. Do not include any other text or markdown formatting.`;
 
   try {
-    const response = await fetch('https://api.x.ai/v1/chat/completions', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'grok-2',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.1,
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.1, responseMimeType: "application/json" },
       }),
     });
 
     if (!response.ok) throw new Error('Planning API failed');
     const json = await response.json() as any;
-    const content = json.choices?.[0]?.message?.content?.trim();
+    const content = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     if (content) {
       const parsed = parseJsonResponse(content);
       if (Array.isArray(parsed)) return parsed;
@@ -234,13 +231,13 @@ Return ONLY a JSON array of strings representing the tools needed. Example: ["MA
 }
 
 async function buildRealDataReport(ticker: string, prompt: string, data: RealResearchData) {
-  const aiReport = await callGrokAPI(ticker, prompt, data);
+  const aiReport = await callGeminiAPI(ticker, prompt, data);
   if (aiReport) return aiReport;
   return synthesizeReportFromRealData(ticker, prompt, data);
 }
 
-async function callGrokAPI(ticker: string, prompt: string, data: RealResearchData) {
-  const apiKey = process.env.XAI_API_KEY;
+async function callGeminiAPI(ticker: string, prompt: string, data: RealResearchData) {
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
 
   const systemPrompt = `You are an elite equity research analyst and investment strategist.
@@ -280,31 +277,24 @@ Verified data payload:
 ${JSON.stringify(data, null, 2)}`;
 
   try {
-    const response = await fetch('https://api.x.ai/v1/chat/completions', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'grok-2',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ parts: [{ text: userPrompt }] }],
+        generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`xAI API returned status ${response.status}: ${errorText}`);
+      throw new Error(`Gemini API returned status ${response.status}: ${errorText}`);
     }
 
     const json = (await response.json()) as any;
-    const contentText = json.choices?.[0]?.message?.content;
-    if (!contentText) throw new Error('Empty response from xAI API');
+    const contentText = json.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!contentText) throw new Error('Empty response from Gemini API');
 
     const parsed = parseJsonResponse(contentText);
     return {
@@ -313,7 +303,7 @@ ${JSON.stringify(data, null, 2)}`;
       citations: mergeCitations(parsed.citations, getRealDataCitations(data)),
     };
   } catch (err: any) {
-    console.error('xAI API call failed, using local real-data synthesis:', err.message);
+    console.error('Gemini API call failed, using local real-data synthesis:', err.message);
     return null;
   }
 }

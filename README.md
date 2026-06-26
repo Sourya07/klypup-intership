@@ -1,80 +1,225 @@
-# AI Investment Research Dashboard
+# Klypup — AI Investment Research Platform
 
-An AI-powered multi-tenant SaaS investment research platform designed for analysts to run advanced research, compare companies, track watchlists, and collaborate within workspace organizations with Role-Based Access Control (RBAC).
-
-## Tech Stack
-- **Frontend:** React, TypeScript, Vite, Tailwind CSS
-- **Backend:** Express, Node.js, TypeScript, Prisma ORM
-- **Database:** Neon Serverless PostgreSQL
-- **Caching & Queue:** Redis (optional, for background jobs)
-- **Deployment & Containers:** Docker, Docker Compose
+> **Multi-tenant SaaS platform** for AI-powered equity research. Analysts can generate deep-dive reports, track watchlists with live price feeds, compare companies side-by-side, and collaborate securely within org-scoped workspaces — all backed by real-time WebSocket updates and a Grok-powered AI research engine.
 
 ---
 
-## Workspace Structure
+## ✨ Features at a Glance
 
-This project is set up as a monorepo containing the following components:
+| Feature | Description |
+|---|---|
+| 🤖 **AI Research Engine** | Run deep equity research via Grok AI (xAI). Generates structured financial reports with citations from SEC filings and market data. |
+| 📊 **Live Watchlist** | Track companies with real-time price ticks via a Finnhub WebSocket webhook stream, cached in-memory (15-min TTL). |
+| ⚖️ **Company Comparisons** | Side-by-side AI-generated comparisons across financial metrics for any set of companies. |
+| 🔔 **Real-Time Updates** | WebSocket server broadcasts `STOCK_UPDATE` events to all connected browser clients instantly. |
+| 🏢 **Multi-Tenancy (RBAC)** | Workspace-level data isolation via `organizationId`. Roles: `ADMIN`, `ANALYST`, `VIEWER`. |
+| 🔗 **Citations & Sources** | Every research report links to verifiable SEC filings, market data sources, and financial fact JSON payloads. |
+
+---
+
+## 🏗 Tech Stack
+
+### Backend (`apps/api`)
+| Layer | Technology |
+|---|---|
+| Server | Node.js · Express · TypeScript |
+| ORM | Prisma |
+| Database | Neon Serverless PostgreSQL |
+| Auth | JWT (RS256) |
+| Real-time | `ws` WebSocket Server |
+| AI | Grok AI API (`x.ai`) |
+| Financial Data | Yahoo Finance API · SEC EDGAR (data.sec.gov) · Finnhub Webhook Stream |
+
+### Frontend (`apps/web`)
+| Layer | Technology |
+|---|---|
+| Framework | React 18 · TypeScript · Vite |
+| Styling | Tailwind CSS |
+| Data Fetching | TanStack Query (React Query) |
+| HTTP Client | Axios |
+| Global State | Zustand |
+| Real-time | WebSocketContext (native browser WS) |
+
+### Shared / Infrastructure
+| Layer | Technology |
+|---|---|
+| Shared Package | `packages/shared` — Zod schemas + TS types (client & server) |
+| Containers | Docker · Docker Compose |
+| CI/CD | GitHub Actions |
+
+---
+
+## 📁 Workspace Structure
 
 ```
-ai-investment-research-dashboard/
-├── .github/                # CI/CD Workflows
+klypup/
+├── .github/                    # CI/CD GitHub Actions workflows
 ├── apps/
-│   ├── api/                # Express Backend REST API
-│   └── web/                # React Frontend Application
+│   ├── api/                    # Express REST API + WebSocket server
+│   └── web/                    # React + Vite frontend SPA
 ├── packages/
-│   └── shared/             # Shared Types, Schemas, and Utilities (TypeScript)
-├── docs/                   # Architectural & Product Documentation
-├── scripts/                # Database setup, migrations, and seed scripts
+│   └── shared/                 # Shared Zod schemas & TypeScript types
+├── docs/                       # Architecture diagrams & specs
+├── scripts/                    # DB setup & migration helpers
+├── docker-compose.yml          # Local service containers
+├── image.png                   # System architecture & API flow diagram
+└── package.json                # Root monorepo configuration
 ```
 
-For a detailed view of the entire repository structure, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+→ Full directory tree with per-file descriptions: [ARCHITECTURE.md](./ARCHITECTURE.md)
+→ Key technical decisions & tradeoffs: [DECISIONS.md](./DECISIONS.md)
 
 ---
 
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js (v18+)
-- Docker & Docker Compose
-- A Neon PostgreSQL Database connection (or local Postgres container)
 
-### Installation
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/username/ai-investment-research-dashboard.git
-   cd ai-investment-research-dashboard
-   ```
+- **Node.js** v18+
+- **Docker & Docker Compose** (for local Postgres / Redis)
+- **Neon PostgreSQL** project — or a local Postgres instance
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+### 1. Clone
 
-3. Configure Environment Variables:
-   Copy `.env.example` to `.env` in the root and in the respective apps:
-   ```bash
-   cp .env.example .env
-   cp apps/api/.env.example apps/api/.env
-   cp apps/web/.env.example apps/web/.env
-   ```
+```bash
+git clone https://github.com/Sourya07/klypup.git
+cd klypup
+```
 
-4. Database Setup & Seed:
-   ```bash
-   npm run db:setup
-   npm run db:seed
-   ```
+### 2. Install Dependencies
 
-5. Run Development Servers:
-   ```bash
-   npm run dev
-   ```
+```bash
+npm install
+```
+
+### 3. Configure Environment
+
+Copy the example env and fill in your credentials:
+
+```bash
+cp .env.example .env
+```
+
+Key variables to set:
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | Neon (or local) PostgreSQL connection string |
+| `DIRECT_URL` | Direct connection URL (for Prisma migrations) |
+| `JWT_SECRET` | Min. 32-char random secret for JWT signing |
+| `XAI_API_KEY` | Grok AI (`x.ai`) API key for research engine |
+| `FINNHUB_API_KEY` | Finnhub key for real-time price webhook stream |
+| `FINNHUB_WEBHOOK_SECRET` | Webhook signature verification secret |
+| `SEC_USER_AGENT` | Required `User-Agent` header for SEC EDGAR requests |
+| `VITE_API_URL` | Frontend → Backend base URL (default: `http://localhost:8000/api/v1`) |
+
+### 4. Database Setup
+
+```bash
+npm run db:setup      # Runs Prisma migrations
+npm run db:seed       # Seeds initial data
+```
+
+### 5. Run in Development
+
+```bash
+npm run dev           # Starts both API (port 8000) and Web (port 5173) concurrently
+```
+
+| Service | URL |
+|---|---|
+| REST API | `http://localhost:8000/api/v1` |
+| WebSocket | `ws://localhost:8000` |
+| Web App | `http://localhost:5173` |
 
 ---
 
-## Architectural Decisions
+## 🌐 API Overview
 
-For full details on the design choices made, refer to [DECISIONS.md](./DECISIONS.md).
+All endpoints are prefixed with `/api/v1`.
 
-- **Multi-Tenant Isolation:** Dynamic organization workspace isolation using a schema-level tenant key (`organizationId`).
-- **Layered Backend architecture:** Clean isolation of Routes -> Controllers -> Services -> Repositories to facilitate mock-testing and clear separation of concerns.
-- **Modular Frontend architecture:** Feature-grouped React structure to keep page-level routing independent of business feature components.
+### Authentication
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/auth/register` | Register a new user + org |
+| `POST` | `/auth/login` | Login & receive JWT |
+| `GET` | `/auth/me` | Get current authenticated user |
+
+### Research
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/research/runs` | Trigger a new AI research run (async) |
+| `GET` | `/research/runs` | List research runs for the org |
+| `GET` | `/research/runs/:id` | Get a specific research report |
+
+### Watchlist
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/watchlist` | Fetch org watchlist with live price data |
+| `POST` | `/watchlist` | Add a company to the watchlist |
+| `DELETE` | `/watchlist/:id` | Remove a company from the watchlist |
+
+### Webhooks
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/v1/webhooks/finnhub` | Finnhub real-time price feed ingestion |
+
+---
+
+## 🔄 Request Lifecycle (AI Research Run)
+
+```
+Browser                   Express API                  External Services
+  │                           │                               │
+  │── POST /research/runs ───►│                               │
+  │◄── { runId } ────────────│                               │
+  │                           │── Spawn background job ──────►│
+  │                           │◄─ Yahoo Finance: prices ──────│
+  │                           │◄─ SEC EDGAR: filings  ────────│
+  │                           │◄─ Grok AI: report JSON ───────│
+  │                           │── Save to Neon DB ────────────│
+  │◄── WS: STOCK_UPDATE ─────│                               │
+  │── GET /research/runs/:id ►│                               │
+  │◄── Full Report JSON ─────│                               │
+```
+
+See the full architecture diagram for all data flows: [`image.png`](./image.png)
+
+---
+
+## 📐 Architecture
+
+### Layered Backend (N-Tier)
+
+Each module under `apps/api/src/modules/` follows a strict layer separation:
+
+```
+Request → Routes → Controller → Service → Repository → Prisma → Neon DB
+                ↑                   ↑
+             Schema (Zod)      External APIs / Jobs
+```
+
+### Modular Frontend (Feature-Based)
+
+```
+src/pages/         ← thin route wrappers only
+src/features/      ← all business logic, hooks, queries per domain
+src/components/    ← pure, reusable UI (Button, Card, Modal)
+src/store/         ← Zustand global state slices
+```
+
+---
+
+## 🔒 Security
+
+- **JWT Authentication** on all protected routes
+- **Tenant Isolation** — every DB query scoped by `organizationId`
+- **RBAC Middleware** — role checks (`ADMIN` / `ANALYST` / `VIEWER`) enforced server-side
+- **Webhook Signature Verification** — Finnhub `HMAC-SHA256` secret validated before processing
+- **Input Validation** — Zod schemas gate every incoming request at the controller boundary
+
+---
+
+## 📜 License
+
+ISC — see [LICENSE](./LICENSE) for details.

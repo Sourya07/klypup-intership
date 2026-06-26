@@ -1,4 +1,4 @@
-import { prisma } from '../../../lib';
+import { prisma, cache } from '../../../lib';
 import { ConflictError, NotFoundError } from '../../../utils/errors';
 
 const COMPANY_NAMES: Record<string, string> = {
@@ -22,31 +22,25 @@ function getCompanyName(symbol: string) {
 
 async function fetchYahooWatchlistData(symbol: string) {
   const ticker = symbol.trim().toUpperCase();
+  const cacheKey = `watchlist:${ticker}`;
 
-  // 1. Try to read from the CompanySnapshot cache first
+  // 1. Try to read from the MemoryCache first (takes <0.01ms)
   try {
-    const cached = await prisma.companySnapshot.findUnique({
-      where: { symbol: ticker },
-    });
-
-    if (cached && cached.expiresAt > new Date()) {
-      const data = cached.data as any;
-      // Ensure it is a full watchlist record (has price and history)
-      if (data && typeof data.price === 'number' && Array.isArray(data.history)) {
-        return {
-          price: data.price,
-          change: data.change ?? 0,
-          sentiment: data.sentiment ?? 'NEUTRAL',
-          trendScore: data.trendScore ?? 50,
-          history: data.history,
-        };
-      }
+    const cached = cache.get<any>(cacheKey);
+    if (cached && typeof cached.price === 'number' && Array.isArray(cached.history)) {
+      return {
+        price: cached.price,
+        change: cached.change ?? 0,
+        sentiment: cached.sentiment ?? 'NEUTRAL',
+        trendScore: cached.trendScore ?? 50,
+        history: cached.history,
+      };
     }
   } catch (err) {
-    console.error(`Failed to read company snapshot cache for ${ticker}:`, err);
+    console.error(`Failed to read memory cache for ${ticker}:`, err);
   }
 
-  // 2. Cache miss or expired/incomplete cache: fetch from Yahoo Finance
+  // 2. Cache miss: fetch baseline data from Yahoo Finance
   const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1mo&interval=1d`;
   
   try {
@@ -75,25 +69,11 @@ async function fetchYahooWatchlistData(symbol: string) {
       prevClose, // Store this so webhook updates can calculate percent changes accurately
     };
 
-    // Store in cache for 15 minutes
+    // Store in MemoryCache for 15 minutes (900,000 ms)
     try {
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-      await prisma.companySnapshot.upsert({
-        where: { symbol: ticker },
-        update: {
-          data: result,
-          fetchedAt: new Date(),
-          expiresAt,
-        },
-        create: {
-          symbol: ticker,
-          data: result,
-          fetchedAt: new Date(),
-          expiresAt,
-        },
-      });
+      cache.set(cacheKey, result, 15 * 60 * 1000);
     } catch (cacheErr) {
-      console.error(`Failed to write company snapshot cache for ${ticker}:`, cacheErr);
+      console.error(`Failed to write memory cache for ${ticker}:`, cacheErr);
     }
 
     return {

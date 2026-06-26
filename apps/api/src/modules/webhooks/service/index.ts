@@ -1,4 +1,4 @@
-import { prisma, broadcast } from '../../../lib';
+import { prisma, broadcast, cache } from '../../../lib';
 
 const FINNHUB_WEBHOOK_SECRET = process.env.FINNHUB_WEBHOOK_SECRET || '';
 
@@ -26,41 +26,19 @@ export async function processFinnhubEvent(payload: Record<string, any>) {
 
   console.log(`[Webhook] Received Finnhub event: type=${eventType}, symbol=${symbol}, timestamp=${timestamp.toISOString()}`);
 
-  // Store the event in the audit log for traceability
-  try {
-    await prisma.auditLog.create({
-      data: {
-        action: 'WEBHOOK_RECEIVED',
-        resource: 'finnhub',
-        resourceId: symbol,
-        details: {
-          eventType,
-          payload,
-          receivedAt: timestamp.toISOString(),
-        },
-        // Use a system-level placeholder since webhooks are not user-initiated
-        userId: 'system',
-        organizationId: 'system',
-      },
-    });
-  } catch (err) {
-    // Audit logging failure should not block webhook acknowledgement.
-    // The audit log may fail if 'system' user/org don't exist with FK constraints.
-    // In that case, just log to console.
-    console.warn('[Webhook] Could not persist audit log (FK constraint likely):', (err as Error).message);
-  }
+  // Note: We intentionally do not write to the AuditLog table for webhook receipts.
+  // Doing so for high-frequency events causes foreign key constraint errors and rapid database bloat.
 
   // If the event contains price data for a symbol on our watchlist,
-  // update the CompanySnapshot cache so dashboards reflect fresh data.
+  // update our MemoryCache so dashboards reflect fresh data without database overhead.
   if (symbol && (eventType === 'trade' || eventType === 'price')) {
     try {
       const price = payload.p ?? payload.price ?? null;
       const volume = payload.v ?? payload.volume ?? null;
 
       if (price !== null) {
-        const existing = await prisma.companySnapshot.findUnique({
-          where: { symbol },
-        });
+        const cacheKey = `watchlist:${symbol}`;
+        const existing = cache.get<any>(cacheKey);
 
         let mergedData: Record<string, any> = {
           price,
@@ -70,23 +48,22 @@ export async function processFinnhubEvent(payload: Record<string, any>) {
           updatedAt: timestamp.toISOString(),
         };
 
-        if (existing && typeof existing.data === 'object' && existing.data !== null) {
-          const currentData = existing.data as Record<string, any>;
-          const prevClose = currentData.prevClose ?? currentData.previousClose ?? currentData.lastPrice ?? price;
+        if (existing) {
+          const prevClose = existing.prevClose ?? existing.lastPrice ?? price;
           const change = prevClose !== 0 ? Number((((price - prevClose) / prevClose) * 100).toFixed(2)) : 0;
           const sentiment = change > 1.0 ? 'BULLISH' : change < -1.0 ? 'BEARISH' : 'NEUTRAL';
           
-          let history = currentData.history || [];
+          let history = existing.history || [];
           if (history.length > 0) {
             history = [...history];
             history[history.length - 1] = price;
           }
 
           mergedData = {
-            ...currentData,
+            ...existing,
             price,
             lastPrice: price,
-            lastVolume: volume ?? currentData.lastVolume,
+            lastVolume: volume ?? existing.lastVolume,
             change,
             sentiment,
             trendScore: Math.round(50 + change * 8),
@@ -96,23 +73,11 @@ export async function processFinnhubEvent(payload: Record<string, any>) {
           };
         }
 
-        await prisma.companySnapshot.upsert({
-          where: { symbol },
-          update: {
-            data: mergedData,
-            fetchedAt: timestamp,
-            expiresAt: new Date(timestamp.getTime() + 15 * 60 * 1000), // Extend TTL
-          },
-          create: {
-            symbol,
-            data: mergedData,
-            fetchedAt: timestamp,
-            expiresAt: new Date(timestamp.getTime() + 15 * 60 * 1000),
-          },
-        });
-        console.log(`[Webhook] Updated and merged CompanySnapshot for ${symbol}: price=${price}`);
+        // Write the merged data back to the MemoryCache with 15 minutes TTL
+        cache.set(cacheKey, mergedData, 15 * 60 * 1000);
+        console.log(`[Webhook] Updated and merged MemoryCache for ${symbol}: price=${price}`);
 
-        // Broadcast the update to all connected WebSocket clients
+        // Broadcast the update to all connected WebSocket clients in real-time
         broadcast('STOCK_UPDATE', {
           symbol,
           price,
@@ -123,7 +88,7 @@ export async function processFinnhubEvent(payload: Record<string, any>) {
         });
       }
     } catch (err) {
-      console.warn(`[Webhook] Failed to update snapshot for ${symbol}:`, (err as Error).message);
+      console.warn(`[Webhook] Failed to update memory cache for ${symbol}:`, (err as Error).message);
     }
   }
 

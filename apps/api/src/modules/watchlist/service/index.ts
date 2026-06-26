@@ -50,8 +50,8 @@ async function fetchYahooWatchlistData(symbol: string) {
     const chart = json?.chart?.result?.[0];
     const meta = chart?.meta;
     
-    const price = meta?.regularMarketPrice ?? meta?.previousClose ?? 0;
-    const prevClose = meta?.previousClose ?? price;
+    const price = meta?.regularMarketPrice ?? meta?.chartPreviousClose ?? 0;
+    const prevClose = meta?.chartPreviousClose ?? price;
     const change = prevClose !== 0 ? Number((((price - prevClose) / prevClose) * 100).toFixed(2)) : 0;
     const sentiment = change > 1.0 ? 'BULLISH' : change < -1.0 ? 'BEARISH' : 'NEUTRAL';
     

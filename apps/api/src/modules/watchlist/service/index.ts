@@ -22,6 +22,31 @@ function getCompanyName(symbol: string) {
 
 async function fetchYahooWatchlistData(symbol: string) {
   const ticker = symbol.trim().toUpperCase();
+
+  // 1. Try to read from the CompanySnapshot cache first
+  try {
+    const cached = await prisma.companySnapshot.findUnique({
+      where: { symbol: ticker },
+    });
+
+    if (cached && cached.expiresAt > new Date()) {
+      const data = cached.data as any;
+      // Ensure it is a full watchlist record (has price and history)
+      if (data && typeof data.price === 'number' && Array.isArray(data.history)) {
+        return {
+          price: data.price,
+          change: data.change ?? 0,
+          sentiment: data.sentiment ?? 'NEUTRAL',
+          trendScore: data.trendScore ?? 50,
+          history: data.history,
+        };
+      }
+    }
+  } catch (err) {
+    console.error(`Failed to read company snapshot cache for ${ticker}:`, err);
+  }
+
+  // 2. Cache miss or expired/incomplete cache: fetch from Yahoo Finance
   const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1mo&interval=1d`;
   
   try {
@@ -41,12 +66,42 @@ async function fetchYahooWatchlistData(symbol: string) {
       .filter((c): c is number => typeof c === 'number' && c !== null)
       .slice(-8); // Get last 8 close prices for sparkline
       
-    return {
+    const result = {
       price,
       change,
       sentiment,
       trendScore: Math.round(50 + change * 8),
       history: history.length > 0 ? history : [price, price, price, price, price, price, price, price],
+      prevClose, // Store this so webhook updates can calculate percent changes accurately
+    };
+
+    // Store in cache for 15 minutes
+    try {
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      await prisma.companySnapshot.upsert({
+        where: { symbol: ticker },
+        update: {
+          data: result,
+          fetchedAt: new Date(),
+          expiresAt,
+        },
+        create: {
+          symbol: ticker,
+          data: result,
+          fetchedAt: new Date(),
+          expiresAt,
+        },
+      });
+    } catch (cacheErr) {
+      console.error(`Failed to write company snapshot cache for ${ticker}:`, cacheErr);
+    }
+
+    return {
+      price: result.price,
+      change: result.change,
+      sentiment: result.sentiment,
+      trendScore: result.trendScore,
+      history: result.history,
     };
   } catch (err) {
     console.error(`Failed to fetch Yahoo watchlist data for ${ticker}:`, err);

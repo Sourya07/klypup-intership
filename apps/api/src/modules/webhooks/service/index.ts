@@ -1,4 +1,4 @@
-import { prisma } from '../../../lib';
+import { prisma, broadcast } from '../../../lib';
 
 const FINNHUB_WEBHOOK_SECRET = process.env.FINNHUB_WEBHOOK_SECRET || '';
 
@@ -58,31 +58,69 @@ export async function processFinnhubEvent(payload: Record<string, any>) {
       const volume = payload.v ?? payload.volume ?? null;
 
       if (price !== null) {
+        const existing = await prisma.companySnapshot.findUnique({
+          where: { symbol },
+        });
+
+        let mergedData: Record<string, any> = {
+          price,
+          lastPrice: price,
+          lastVolume: volume,
+          source: 'finnhub_webhook',
+          updatedAt: timestamp.toISOString(),
+        };
+
+        if (existing && typeof existing.data === 'object' && existing.data !== null) {
+          const currentData = existing.data as Record<string, any>;
+          const prevClose = currentData.prevClose ?? currentData.previousClose ?? currentData.lastPrice ?? price;
+          const change = prevClose !== 0 ? Number((((price - prevClose) / prevClose) * 100).toFixed(2)) : 0;
+          const sentiment = change > 1.0 ? 'BULLISH' : change < -1.0 ? 'BEARISH' : 'NEUTRAL';
+          
+          let history = currentData.history || [];
+          if (history.length > 0) {
+            history = [...history];
+            history[history.length - 1] = price;
+          }
+
+          mergedData = {
+            ...currentData,
+            price,
+            lastPrice: price,
+            lastVolume: volume ?? currentData.lastVolume,
+            change,
+            sentiment,
+            trendScore: Math.round(50 + change * 8),
+            history,
+            source: 'finnhub_webhook',
+            updatedAt: timestamp.toISOString(),
+          };
+        }
+
         await prisma.companySnapshot.upsert({
           where: { symbol },
           update: {
-            data: {
-              lastPrice: price,
-              lastVolume: volume,
-              source: 'finnhub_webhook',
-              updatedAt: timestamp.toISOString(),
-            },
+            data: mergedData,
             fetchedAt: timestamp,
-            expiresAt: new Date(timestamp.getTime() + 5 * 60 * 1000), // 5 min TTL
+            expiresAt: new Date(timestamp.getTime() + 15 * 60 * 1000), // Extend TTL
           },
           create: {
             symbol,
-            data: {
-              lastPrice: price,
-              lastVolume: volume,
-              source: 'finnhub_webhook',
-              updatedAt: timestamp.toISOString(),
-            },
+            data: mergedData,
             fetchedAt: timestamp,
-            expiresAt: new Date(timestamp.getTime() + 5 * 60 * 1000),
+            expiresAt: new Date(timestamp.getTime() + 15 * 60 * 1000),
           },
         });
-        console.log(`[Webhook] Updated CompanySnapshot for ${symbol}: price=${price}`);
+        console.log(`[Webhook] Updated and merged CompanySnapshot for ${symbol}: price=${price}`);
+
+        // Broadcast the update to all connected WebSocket clients
+        broadcast('STOCK_UPDATE', {
+          symbol,
+          price,
+          change: mergedData.change ?? 0,
+          sentiment: mergedData.sentiment ?? 'NEUTRAL',
+          trendScore: mergedData.trendScore ?? 50,
+          history: mergedData.history ?? [],
+        });
       }
     } catch (err) {
       console.warn(`[Webhook] Failed to update snapshot for ${symbol}:`, (err as Error).message);

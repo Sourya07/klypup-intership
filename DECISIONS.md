@@ -28,10 +28,10 @@ Each ADR follows the format: **Decision → Context → Rationale → Tradeoffs*
 
 **Decision:** Run a dedicated Express.js server in `apps/api` rather than using Next.js API Routes or a serverless function platform.
 
-**Context:** The research engine requires long-running AI calls (multi-second Grok AI completions), background job processing, and a persistent WebSocket server — all patterns that conflict with the stateless, short-lived execution model of serverless functions.
+**Context:** The research engine requires long-running AI calls (multi-second Gemini AI completions), background job processing, and a persistent WebSocket server — all patterns that conflict with the stateless, short-lived execution model of serverless functions.
 
 **Rationale:**
-- **Long-running connections** — Grok AI research jobs can take 10–30 seconds. Serverless functions impose strict execution time limits; Express handles these gracefully.
+- **Long-running connections** — Gemini AI research jobs can take 10–30 seconds. Serverless functions impose strict execution time limits; Express handles these gracefully.
 - **WebSocket support** — A persistent `ws` WebSocket server must share the same process and port as the REST API to broadcast `STOCK_UPDATE` events. This is not possible in a serverless model.
 - **Background jobs** — In-process async workers can be spawned and managed within Express's lifecycle without external queue infrastructure.
 - **Architectural clarity** — A dedicated API layer makes the Routes → Controller → Service → Repository pattern explicit and easy to reason about during code review.
@@ -62,7 +62,7 @@ Each ADR follows the format: **Decision → Context → Rationale → Tradeoffs*
 
 ## ADR-04 · In-Memory Price Cache (RAM, 15-min TTL)
 
-**Decision:** Cache incoming Finnhub webhook price ticks in a Node.js in-memory `Map` with a 15-minute TTL, instead of writing every tick to the database or setting up Redis.
+**Decision:** Cache incoming Finnhub WebSocket price ticks in a Node.js in-memory `Map` with a 15-minute TTL, instead of writing every tick to the database or setting up Redis.
 
 **Context:** Finnhub delivers frequent real-time price updates for every tracked ticker. Writing each tick to PostgreSQL would create excessive write pressure. The frontend watchlist only needs prices that are "fresh enough" (within 15 minutes) — stale-while-revalidate semantics are acceptable.
 
@@ -98,7 +98,7 @@ Each ADR follows the format: **Decision → Context → Rationale → Tradeoffs*
 
 **Decision:** Use the `ws` library to run a WebSocket server co-hosted on the same HTTP server instance as the Express REST API, rather than a separate WebSocket service.
 
-**Context:** Real-time `STOCK_UPDATE` events need to be pushed to all connected browser clients whenever a Finnhub webhook tick is received or a research job completes.
+**Context:** Real-time `STOCK_UPDATE` events need to be pushed to all connected browser clients whenever a Finnhub WebSocket tick is received or a research job completes.
 
 **Rationale:**
 - **Zero additional port or service** — `initWebSocketServer(httpServer)` binds the WS server to the same port as Express. One process, one port.

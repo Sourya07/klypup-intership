@@ -1,4 +1,5 @@
 import { prisma, cache } from '../../../lib';
+import { subscribeToFinnhub } from '../../../lib/finnhubWs';
 import { ConflictError, NotFoundError } from '../../../utils/errors';
 
 const COMPANY_NAMES: Record<string, string> = {
@@ -44,7 +45,11 @@ async function fetchYahooWatchlistData(symbol: string) {
   const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1mo&interval=1d`;
   
   try {
-    const response = await fetch(chartUrl);
+    const response = await fetch(chartUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
     if (!response.ok) throw new Error(`Status ${response.status}`);
     const json = await response.json() as any;
     const chart = json?.chart?.result?.[0];
@@ -84,7 +89,43 @@ async function fetchYahooWatchlistData(symbol: string) {
       history: result.history,
     };
   } catch (err) {
-    console.error(`Failed to fetch Yahoo watchlist data for ${ticker}:`, err);
+    console.error(`Failed to fetch Yahoo watchlist data for ${ticker}:`, (err as Error).message);
+    
+    // Fallback to Finnhub REST API if Yahoo fails (e.g. 429 Too Many Requests)
+    const finnhubKey = process.env.FINNHUB_API_KEY;
+    if (finnhubKey) {
+      try {
+        const fhRes = await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${finnhubKey}`);
+        if (fhRes.ok) {
+          const fhData = await fhRes.json() as any;
+          if (fhData && typeof fhData.c === 'number' && fhData.c !== 0) {
+            const price = fhData.c;
+            const prevClose = fhData.pc || price;
+            const change = prevClose !== 0 ? Number((((price - prevClose) / prevClose) * 100).toFixed(2)) : 0;
+            const result = {
+              price,
+              change,
+              sentiment: change > 1.0 ? 'BULLISH' : change < -1.0 ? 'BEARISH' : 'NEUTRAL',
+              trendScore: Math.round(50 + change * 8),
+              history: [price, price, price, price, price, price, price, price],
+              prevClose,
+            };
+            try { cache.set(cacheKey, result, 15 * 60 * 1000); } catch (e) {}
+            console.log(`[Watchlist] Used Finnhub fallback for ${ticker}`);
+            return {
+              price: result.price,
+              change: result.change,
+              sentiment: result.sentiment,
+              trendScore: result.trendScore,
+              history: result.history,
+            };
+          }
+        }
+      } catch (fhErr) {
+        console.error(`Failed to fetch Finnhub fallback data for ${ticker}:`, (fhErr as Error).message);
+      }
+    }
+
     return {
       price: 0,
       change: 0,
@@ -128,7 +169,7 @@ export async function addToWatchlist(orgId: string, userId: string, ticker: stri
     throw new ConflictError(`${symbol} is already in your watchlist`);
   }
 
-  return prisma.watchlistItem.create({
+  const newItem = await prisma.watchlistItem.create({
     data: {
       symbol,
       companyName: getCompanyName(symbol),
@@ -136,6 +177,10 @@ export async function addToWatchlist(orgId: string, userId: string, ticker: stri
       createdById: userId,
     },
   });
+
+  subscribeToFinnhub(symbol);
+
+  return newItem;
 }
 
 export async function removeFromWatchlist(orgId: string, itemId: string) {

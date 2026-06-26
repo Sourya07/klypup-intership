@@ -10,6 +10,7 @@ import webhooksRouter from "./modules/webhooks/routes";
 import { errorHandler } from "./middleware";
 import { sendError } from "./utils";
 import { initWebSocketServer } from "./lib";
+import { initFinnhubWebSocket } from "./lib/finnhubWs";
 
 dotenv.config();
 
@@ -56,5 +57,6 @@ const server = app.listen(PORT, () => {
 });
 
 initWebSocketServer(server);
+initFinnhubWebSocket();
 
 export default app;

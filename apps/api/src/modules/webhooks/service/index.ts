@@ -19,7 +19,7 @@ export function validateFinnhubSecret(headerSecret: string | undefined): boolean
  * Finnhub can send various event types: trade updates, news, earnings, etc.
  * We log the event and update relevant watchlist/snapshot data.
  */
-async function updateCacheAndBroadcast(symbol: string, price: number, volume: number | null, timestamp: Date) {
+export async function updateCacheAndBroadcast(symbol: string, price: number, volume: number | null, timestamp: Date) {
   try {
     const cleanSymbol = symbol.trim().toUpperCase();
     const cacheKey = `watchlist:${cleanSymbol}`;

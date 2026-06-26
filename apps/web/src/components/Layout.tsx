@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
+import { searchService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { 
@@ -25,6 +26,43 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (searchQuery.trim().length >= 1) {
+        setIsSearching(true);
+        try {
+          const results = await searchService.searchEquities(searchQuery);
+          setSearchResults(results);
+          setShowSearchDropdown(true);
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setIsSearching(false);
+        }
+      } else {
+        setSearchResults([]);
+        setShowSearchDropdown(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: BarChart4 },
@@ -209,14 +247,47 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               </span>
             </div>
 
-            {/* Mock global ticker search */}
-            <div className="hidden md:flex items-center space-x-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded px-2.5 py-1.5 w-64 group focus-within:border-zinc-800 dark:focus-within:border-zinc-400 transition-colors">
+            {/* Global ticker search */}
+            <div ref={searchRef} className="hidden md:flex items-center space-x-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded px-2.5 py-1.5 w-72 group focus-within:border-zinc-800 dark:focus-within:border-zinc-400 transition-colors relative">
               <Search className="w-4 h-4 text-zinc-400 dark:text-zinc-500 shrink-0" />
               <input 
                 type="text" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => { if (searchResults.length > 0) setShowSearchDropdown(true); }}
                 placeholder="Search equity, watchlists..." 
                 className="bg-transparent border-none text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none w-full placeholder-zinc-400 dark:placeholder-zinc-600"
               />
+              {/* Search Dropdown */}
+              {showSearchDropdown && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded shadow-xl overflow-hidden z-50">
+                  {isSearching ? (
+                    <div className="p-4 text-xs text-center text-zinc-500">Searching...</div>
+                  ) : searchResults.length > 0 ? (
+                    <div className="max-h-64 overflow-y-auto">
+                      {searchResults.map((res: any, idx: number) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setShowSearchDropdown(false);
+                            setSearchQuery('');
+                            navigate(`/research/new?ticker=${res.symbol}`);
+                          }}
+                          className="w-full text-left px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/50 last:border-0"
+                        >
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate">{res.displaySymbol}</span>
+                            <span className="text-[10px] text-zinc-500 dark:text-zinc-500 truncate">{res.description}</span>
+                          </div>
+                          <span className="text-[9px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 px-1.5 py-0.5 rounded ml-2 shrink-0">{res.type}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 text-xs text-center text-zinc-500">No results found</div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

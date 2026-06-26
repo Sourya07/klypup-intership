@@ -4,20 +4,20 @@
 
 ---
 
-## ✨ Features at a Glance
+##  Features at a Glance
 
 | Feature | Description |
 |---|---|
-| 🤖 **AI Research Engine** | Run deep equity research via Grok AI (xAI). Generates structured financial reports with citations from SEC filings and market data. |
-| 📊 **Live Watchlist** | Track companies with real-time price ticks via a Finnhub WebSocket webhook stream, cached in-memory (15-min TTL). |
-| ⚖️ **Company Comparisons** | Side-by-side AI-generated comparisons across financial metrics for any set of companies. |
-| 🔔 **Real-Time Updates** | WebSocket server broadcasts `STOCK_UPDATE` events to all connected browser clients instantly. |
-| 🏢 **Multi-Tenancy (RBAC)** | Workspace-level data isolation via `organizationId`. Roles: `ADMIN`, `ANALYST`, `VIEWER`. |
-| 🔗 **Citations & Sources** | Every research report links to verifiable SEC filings, market data sources, and financial fact JSON payloads. |
+|  **AI Research Engine** | Run deep equity research via Grok AI (xAI). Generates structured financial reports with citations from SEC filings and market data. |
+|  **Live Watchlist** | Track companies with real-time price ticks via a Finnhub WebSocket webhook stream, cached in-memory (15-min TTL). |
+|  **Company Comparisons** | Side-by-side AI-generated comparisons across financial metrics for any set of companies. |
+| **Real-Time Updates** | WebSocket server broadcasts `STOCK_UPDATE` events to all connected browser clients instantly. |
+|  **Multi-Tenancy (RBAC)** | Workspace-level data isolation via `organizationId`. Roles: `ADMIN`, `ANALYST`, `VIEWER`. |
+|  **Citations & Sources** | Every research report links to verifiable SEC filings, market data sources, and financial fact JSON payloads. |
 
 ---
 
-## 🏗 Tech Stack
+##  Tech Stack
 
 ### Backend (`apps/api`)
 | Layer | Technology |
@@ -49,7 +49,7 @@
 
 ---
 
-## 📁 Workspace Structure
+##  Workspace Structure
 
 ```
 klypup/
@@ -71,7 +71,7 @@ klypup/
 
 ---
 
-## 🚀 Getting Started
+##  Getting Started
 
 ### Prerequisites
 
@@ -166,7 +166,7 @@ All endpoints are prefixed with `/api/v1`.
 
 ---
 
-## 🔄 Request Lifecycle (AI Research Run)
+##  Request Lifecycle (AI Research Run)
 
 ```
 Browser                   Express API                  External Services
@@ -187,7 +187,7 @@ See the full architecture diagram for all data flows: [`image.png`](./image.png)
 
 ---
 
-## 📐 Architecture
+##  Architecture
 
 ### Layered Backend (N-Tier)
 
@@ -210,6 +210,22 @@ src/store/         ← Zustand global state slices
 
 ---
 
+## ☁️ CI/CD & Deployment (AWS EC2)
+
+The repository includes a ready-to-use GitHub Actions CD pipeline ([`cd.yml`](./.github/workflows/cd.yml)) configured for deployment to an AWS EC2 instance.
+
+**How it works:**
+1. **Builds & Pushes** Docker images to GitHub Container Registry (`ghcr.io`).
+2. **Copies** the `docker-compose.yml` securely to your EC2 instance via SCP.
+3. **Executes** SSH commands on the EC2 instance to pull the new images and run `docker-compose up -d`.
+
+To enable this, set the following secrets in your GitHub repository:
+- `EC2_HOST` — The public IP or DNS of your AWS EC2 instance.
+- `EC2_USERNAME` — Your SSH user (e.g., `ubuntu` or `ec2-user`).
+- `EC2_SSH_KEY` — Your private SSH `.pem` key.
+
+---
+
 ## 🔒 Security
 
 - **JWT Authentication** on all protected routes
@@ -220,6 +236,6 @@ src/store/         ← Zustand global state slices
 
 ---
 
-## 📜 License
+##  License
 
 ISC — see [LICENSE](./LICENSE) for details.

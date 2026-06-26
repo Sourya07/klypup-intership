@@ -110,3 +110,88 @@ body {
 .animate-slide-up {
   animation: slideUp 0.2s ease-out forwards;
 }
+
+/* ─── PRINT STYLES FOR PREMIUM RESEARCH REPORT EXPORTS ─── */
+@media print {
+  /* Hide sidebars, top headers, breadcrumbs, action buttons, modals, and overlays */
+  aside,
+  header,
+  nav,
+  button,
+  a,
+  .no-print,
+  [role="dialog"],
+  .fixed,
+  .absolute {
+    display: none !important;
+  }
+
+  /* Reset main viewport and background colors to pure print-friendly white */
+  html, body, #root, .min-h-screen {
+    background: #ffffff !important;
+    color: #000000 !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  /* Flatten card styles, border-colors, and backgrounds for paper compatibility */
+  .bg-white, 
+  .dark .bg-zinc-950, 
+  .dark .bg-zinc-900, 
+  .bg-zinc-50, 
+  .dark .bg-black,
+  .bg-zinc-100,
+  .dark .bg-zinc-900 {
+    background-color: #ffffff !important;
+    background-image: none !important;
+    color: #000000 !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: none !important;
+  }
+
+  .text-zinc-900, .dark .text-white, .text-zinc-800, .text-zinc-700, .text-zinc-600 {
+    color: #000000 !important;
+  }
+
+  .text-zinc-500, .text-zinc-400, .dark .text-zinc-400, .dark .text-zinc-500 {
+    color: #4b5563 !important; /* Dark gray for sharp text readability */
+  }
+
+  /* Force browsers to print exact backgrounds (like sentiment badges and colors) */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Prevent page breaks cutting directly in the middle of sections or cards */
+  .card, 
+  .grid > div, 
+  .border, 
+  blockquote, 
+  tr, 
+  pre,
+  .recharts-responsive-container {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Custom helper to force section starts on new pages if needed */
+  .page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+}

@@ -172,8 +172,7 @@ export const ResearchResults: React.FC = () => {
   };
 
   const handleExportPDF = () => {
-    if (!report) return;
-    alert(`Exporting ${report.ticker} Research Report as PDF package...`);
+    window.print();
   };
 
   if (loading) {

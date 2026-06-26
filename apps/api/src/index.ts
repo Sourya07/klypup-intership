@@ -7,6 +7,7 @@ import researchRouter from "./modules/research/routes";
 import watchlistRouter from "./modules/watchlist/routes";
 import compareRouter from "./modules/compare/routes";
 import webhooksRouter from "./modules/webhooks/routes";
+import searchRouter from "./modules/search/routes";
 import { errorHandler } from "./middleware";
 import { sendError } from "./utils";
 import { initWebSocketServer } from "./lib";
@@ -43,6 +44,9 @@ app.use("/api/v1/compare", compareRouter);
 
 app.use("/api/webhooks", webhooksRouter);
 app.use("/api/v1/webhooks", webhooksRouter);
+
+app.use("/api/search", searchRouter);
+app.use("/api/v1/search", searchRouter);
 
 app.use("/api", (req, res) => {
   sendError(res, 404, `API route not found: ${req.method} ${req.originalUrl}`);

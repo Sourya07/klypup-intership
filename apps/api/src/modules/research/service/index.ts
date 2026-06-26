@@ -3,7 +3,7 @@ import { prisma } from '../../../lib';
 import { NotFoundError } from '../../../utils/errors';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const SEC_USER_AGENT = process.env.SEC_USER_AGENT || 'Klypup Research contact@example.com';
+const SEC_USER_AGENT = process.env.SEC_USER_AGENT || 'Klypup Research [EMAIL_ADDRESS]';
 
 type MetricValue = number | string | null;
 

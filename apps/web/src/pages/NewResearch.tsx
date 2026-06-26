@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, ProgressStepper, Input } from '../components/UI';
 import { Sparkles, HelpCircle, Terminal, RefreshCw, AlertCircle } from 'lucide-react';
 import { researchService } from '../services/api';
@@ -7,8 +7,9 @@ import { ResearchRun } from '../types/api';
 
 export const NewResearch: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
-  const [ticker, setTicker] = useState('');
+  const [ticker, setTicker] = useState(searchParams.get('ticker') || '');
   const [prompt, setPrompt] = useState('');
   const [depth, setDepth] = useState<'quick' | 'detailed'>('detailed');
   const [activeRun, setActiveRun] = useState<ResearchRun | null>(null);

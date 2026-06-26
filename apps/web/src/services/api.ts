@@ -106,3 +106,11 @@ export const compareService = {
     throw new Error('Failed to compare companies');
   }
 };
+
+export const searchService = {
+  searchEquities: async (query: string): Promise<any[]> => {
+    if (!query) return [];
+    const response = await apiClient.get(`/search?q=${encodeURIComponent(query)}`);
+    return response.data || [];
+  }
+};

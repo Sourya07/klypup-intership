@@ -176,7 +176,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           <div className="w-7 h-7 rounded bg-white text-zinc-900 flex items-center justify-center font-black text-xs">
             AG
           </div>
-          <span className="text-sm font-bold tracking-tight">Antigravity AI</span>
+          <span className="text-sm font-bold tracking-tight">kly AI</span>
         </Link>
         <button 
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}

@@ -116,7 +116,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               AG
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-bold text-white tracking-tight leading-none">Antigravity AI</span>
+              <span className="text-sm font-bold text-white tracking-tight leading-none">AI</span>
               <span className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">Research Hub</span>
             </div>
           </Link>

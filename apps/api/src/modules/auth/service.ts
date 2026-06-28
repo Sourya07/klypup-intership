@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { UserRole } from '@prisma/client';
 import { prisma } from '../../lib';
 import { env } from '../../config';
-import { UnauthorizedError, ConflictError } from '../../utils/errors';
+import { UnauthorizedError, ConflictError, ValidationError } from '../../utils/errors';
 import { SignupInput, LoginInput } from './schema';
 import { AuthResponse, TokenPair } from './types';
 
@@ -25,15 +25,51 @@ function slugify(text: string): string {
     .replace(/^-|-$/g, '');
 }
 
+export async function checkPendingInvite(email: string) {
+  const invite = await prisma.invite.findFirst({
+    where: {
+      email,
+      accepted: false,
+      expiresAt: { gt: new Date() },
+    },
+    include: {
+      organization: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  });
+
+  if (!invite) return null;
+
+  return {
+    id: invite.id,
+    email: invite.email,
+    role: invite.role,
+    organizationName: invite.organization.name,
+  };
+}
+
 export async function signup(input: SignupInput): Promise<AuthResponse> {
   const existing = await prisma.user.findUnique({ where: { email: input.email } });
   if (existing) throw new ConflictError('An account with this email already exists');
 
   const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
-  const slug = slugify(input.organizationName) + '-' + uuidv4().slice(0, 6);
 
-  // Transaction: create user, org, and membership atomically
-  const result = await prisma.$transaction(async (tx:any) => {
+  // Check for pending invite
+  const invite = await prisma.invite.findFirst({
+    where: {
+      email: input.email,
+      accepted: false,
+      expiresAt: { gt: new Date() },
+    },
+    include: {
+      organization: true,
+    },
+  });
+
+  const result = await prisma.$transaction(async (tx: any) => {
     const user = await tx.user.create({
       data: {
         email: input.email,
@@ -42,30 +78,53 @@ export async function signup(input: SignupInput): Promise<AuthResponse> {
       },
     });
 
-    const org = await tx.organization.create({
-      data: {
-        name: input.organizationName,
-        slug,
-      },
-    });
+    if (invite) {
+      await tx.membership.create({
+        data: {
+          userId: user.id,
+          organizationId: invite.organizationId,
+          role: invite.role,
+        },
+      });
 
-    const membership = await tx.membership.create({
-      data: {
-        userId: user.id,
-        organizationId: org.id,
-        role: 'ADMIN',
-      },
-    });
+      await tx.invite.update({
+        where: { id: invite.id },
+        data: { accepted: true },
+      });
 
-    return { user, org, membership };
-  });
+      return { user, org: invite.organization, role: invite.role };
+    } else {
+      if (!input.organizationName) {
+        throw new ValidationError('Organization name is required');
+      }
 
-  const tokens = await createTokenPair(result.user.id, result.org.id, result.membership.role, result.user.email);
+      const slug = slugify(input.organizationName) + '-' + uuidv4().slice(0, 6);
+
+      const org = await tx.organization.create({
+        data: {
+          name: input.organizationName,
+          slug,
+        },
+      });
+
+      const membership = await tx.membership.create({
+        data: {
+          userId: user.id,
+          organizationId: org.id,
+          role: 'ADMIN',
+        },
+      });
+
+      return { user, org, role: membership.role };
+    }
+  }, { maxWait: 15000, timeout: 30000 });
+
+  const tokens = await createTokenPair(result.user.id, result.org.id, result.role, result.user.email);
 
   return {
     user: { id: result.user.id, email: result.user.email, name: result.user.name },
     organization: { id: result.org.id, name: result.org.name, slug: result.org.slug },
-    role: result.membership.role,
+    role: result.role,
     tokens,
   };
 }

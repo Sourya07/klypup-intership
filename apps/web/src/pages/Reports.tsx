@@ -227,7 +227,7 @@ export const Reports: React.FC = () => {
                           <Eye className="w-4 h-4" />
                         </button>
                         
-                        {role !== 'VIEWER' && (
+                        {role === 'ADMIN' && (
                           <button 
                             onClick={(e) => handleDeleteTrigger(report.id, e)}
                             className="p-1 rounded text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-red-600 dark:hover:text-red-400 transition-colors"

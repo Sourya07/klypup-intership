@@ -24,8 +24,9 @@ export function errorHandler() {
         code: err.code,
         path: req.path,
         requestId: req.requestId,
+        details: err.details,
       });
-      return sendError(res, err.statusCode, err.message);
+      return sendError(res, err.statusCode, err.message, err.details ? { details: err.details } : undefined);
     }
 
     // Unexpected errors

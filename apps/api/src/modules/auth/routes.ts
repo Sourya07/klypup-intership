@@ -10,5 +10,6 @@ router.post('/login', validate(loginSchema), controller.login);
 router.post('/refresh', validate(refreshSchema), controller.refresh);
 router.post('/logout', validate(logoutSchema), controller.logout);
 router.get('/me', authenticate(), controller.me);
+router.get('/check-invite', controller.checkInvite);
 
 export default router;

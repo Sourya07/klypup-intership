@@ -46,3 +46,17 @@ export async function me(req: Request, res: Response, next: NextFunction) {
     next(err);
   }
 }
+
+export async function checkInvite(req: Request, res: Response, next: NextFunction) {
+  try {
+    const email = req.query.email as string;
+    if (!email) {
+      sendSuccess(res, null);
+      return;
+    }
+    const invite = await authService.checkPendingInvite(email);
+    sendSuccess(res, invite);
+  } catch (err) {
+    next(err);
+  }
+}

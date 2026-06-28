@@ -265,24 +265,24 @@ export const ResearchResults: React.FC = () => {
 
           {/* Guarded actions: Edit and Delete */}
           {role !== 'VIEWER' && (
-            <>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setEditModalOpen(true)}
-                className="text-xs font-semibold rounded"
-              >
-                <Edit3 className="w-3.5 h-3.5 mr-1.5" /> Edit
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => setDeleteDialogOpen(true)}
-                className="text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-700 dark:hover:text-red-300 font-semibold rounded"
-              >
-                <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
-              </Button>
-            </>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setEditModalOpen(true)}
+              className="text-xs font-semibold rounded"
+            >
+              <Edit3 className="w-3.5 h-3.5 mr-1.5" /> Edit
+            </Button>
+          )}
+          {role === 'ADMIN' && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setDeleteDialogOpen(true)}
+              className="text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-700 dark:hover:text-red-300 font-semibold rounded"
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
+            </Button>
           )}
         </div>
       </div>

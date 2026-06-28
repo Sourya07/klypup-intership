@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/UI';
 import { Shield } from 'lucide-react';
+import { apiClient } from '../lib/axios';
 
 export const Signup: React.FC = () => {
   const { signup } = useAuth();
@@ -15,9 +16,39 @@ export const Signup: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const [hasInvite, setHasInvite] = useState(false);
+  const [invitedOrgName, setInvitedOrgName] = useState('');
+  const [invitedRole, setInvitedRole] = useState('');
+
+  const checkInvite = async (emailToCheck: string) => {
+    if (!emailToCheck || !emailToCheck.includes('@') || emailToCheck.length < 5) {
+      setHasInvite(false);
+      setInvitedOrgName('');
+      setInvitedRole('');
+      return;
+    }
+    try {
+      const response = await apiClient.get(`/auth/check-invite?email=${encodeURIComponent(emailToCheck)}`);
+      if (response.data?.success && response.data?.data) {
+        setHasInvite(true);
+        setInvitedOrgName(response.data.data.organizationName);
+        setInvitedRole(response.data.data.role);
+      } else {
+        setHasInvite(false);
+        setInvitedOrgName('');
+        setInvitedRole('');
+      }
+    } catch (e) {
+      console.error('Failed to check invite:', e);
+      setHasInvite(false);
+      setInvitedOrgName('');
+      setInvitedRole('');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !email || !password || !organizationName) {
+    if (!name || !email || !password || (!hasInvite && !organizationName)) {
       setError('All fields are required.');
       return;
     }
@@ -26,7 +57,12 @@ export const Signup: React.FC = () => {
     setError('');
 
     try {
-      await signup({ name, email, password, organizationName });
+      await signup({ 
+        name, 
+        email, 
+        password, 
+        organizationName: hasInvite ? 'Invited Member' : organizationName 
+      });
       navigate('/', { replace: true });
     } catch (err: any) {
       setError(err.message || 'Failed to create organization. Please try again.');
@@ -106,6 +142,7 @@ export const Signup: React.FC = () => {
                 placeholder="Marcus Aurelius"
                 className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-zinc-900 dark:focus:border-zinc-400 transition-colors"
                 required
+                minLength={2}
               />
             </div>
 
@@ -114,7 +151,13 @@ export const Signup: React.FC = () => {
               <input 
                 type="email" 
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (e.target.value.includes('@') && e.target.value.includes('.')) {
+                    checkInvite(e.target.value);
+                  }
+                }}
+                onBlur={(e) => checkInvite(e.target.value)}
                 placeholder="marcus@aurelius-capital.com"
                 className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-zinc-900 dark:focus:border-zinc-400 transition-colors"
                 required
@@ -134,21 +177,27 @@ export const Signup: React.FC = () => {
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1 block">Organization / Firm Name</label>
-              <input 
-                type="text" 
-                value={organizationName}
-                onChange={(e) => setOrganizationName(e.target.value)}
-                placeholder="Aurelius Capital Management"
-                className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-zinc-900 dark:focus:border-zinc-400 transition-colors"
-                required
-              />
-            </div>
+            {hasInvite ? (
+              <div className="p-3.5 bg-emerald-500/10 dark:bg-emerald-500/5 border border-emerald-500/20 rounded text-xs text-emerald-700 dark:text-emerald-400 font-semibold leading-normal animate-fade-in">
+                Invitation verified! You will automatically join <strong className="underline decoration-wavy">{invitedOrgName}</strong> as an {invitedRole.toLowerCase()}.
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1 block">Organization / Firm Name</label>
+                <input 
+                  type="text" 
+                  value={organizationName}
+                  onChange={(e) => setOrganizationName(e.target.value)}
+                  placeholder="Aurelius Capital Management"
+                  className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-zinc-900 dark:focus:border-zinc-400 transition-colors"
+                  required
+                />
+              </div>
+            )}
 
             <div className="pt-3">
               <Button type="submit" variant="primary" className="w-full py-2.5 rounded text-sm font-bold" loading={loading}>
-                Provision Workspace
+                {hasInvite ? 'Join Organization' : 'Provision Workspace'}
               </Button>
             </div>
           </form>
